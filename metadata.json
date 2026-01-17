@@ -1,0 +1,5 @@
+{
+  "name": "Thesaurus CM Finances",
+  "description": "An interactive accounting app for the children's ministry to track income, expenses, and transfers with reporting and WhatsApp generation capabilities.",
+  "requestFramePermissions": []
+}
