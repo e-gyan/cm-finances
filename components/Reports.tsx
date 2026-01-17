@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, TransactionType, User, AccountType } from '../types';
-import { formatCurrency, getGreeting } from '../utils';
-import { FileText, Calendar, TrendingUp, TrendingDown, Plus, Save, Trash2, Download, PieChart, ChevronDown, BarChart2, Target, MessageCircle, AlertTriangle, X, Check, User as UserIcon, Send, Sparkles, Loader2 } from 'lucide-react';
+import { formatCurrency } from '../utils';
+import { FileText, Calendar, TrendingUp, TrendingDown, Plus, Save, Trash2, Download, PieChart, ChevronDown, BarChart2, Target, MessageCircle, AlertTriangle, X, Check, User as UserIcon, Send, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   Cell
@@ -217,6 +217,40 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       }
   };
 
+  const handleReconcileCash = () => {
+    const balance = weeklyStats.cashBalance;
+    if (balance === 0) {
+        alert("Cash position is balanced. No transfer needed.");
+        return;
+    }
+
+    const isSurplus = balance > 0;
+    const amount = Math.abs(balance);
+    
+    // Prompt for confirmation
+    const message = isSurplus 
+        ? `Surplus of ${formatCurrency(amount)} detected.\n\nAction: Transfer remaining cash to MoMo Receivables.`
+        : `Deficit of ${formatCurrency(amount)} detected.\n\nAction: Transfer from MoMo Receivables to cover cash expenses.`;
+
+    if (!window.confirm(message)) return;
+
+    const transaction: Omit<Transaction, 'id'> = {
+        date: selectedWeekDate, // Use calculation date
+        type: TransactionType.TRANSFER,
+        category: 'Finance Transfer',
+        amount: amount,
+        accountId: isSurplus ? AccountType.CASH : AccountType.MOMO,
+        toAccountId: isSurplus ? AccountType.MOMO : AccountType.CASH,
+        notes: isSurplus 
+            ? "Remaining cash offering after expenses at hand."
+            : "Transfer to support weekly purchases.",
+        isArchived: false
+    };
+
+    onAddTransaction(transaction);
+    alert("Reconciliation transfer added successfully.");
+  };
+
   const saveWeeklyData = () => {
     const today = new Date().toISOString().split('T')[0];
     const batchToAdd: Omit<Transaction, 'id'>[] = [];
@@ -297,9 +331,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       
       if (weeklyStats.cashBalance < 0 && selectedFinanceRep) {
            //text += `\n*URGENT REQUEST*\n`;
-           text += `Dear ${selectedFinanceRep},\n`;
+           text += `Dear ${selectedFinanceRep},`;
            text += `We have a deficit of *${formatCurrency(Math.abs(weeklyStats.cashBalance))}* for this week's purchases.\n`;
-           text += `Kindly transfer this amount via MoMo to:\n`;
+           text += `Please kindly transfer this amount via MoMo to:\n`;
            text += `*Name:* ${selectedBeneficiary}\n`;
            text += `*Number:* ${beneficiaryNumber}\n\n`;
            text += `Thank you for you time and God bless you\n`;
@@ -457,14 +491,24 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
                 {/* Modified Summary Card for Cash Balance */}
                 <div className="bg-gray-900 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-3xl flex flex-col justify-between md:col-span-2 lg:col-span-1 shadow-2xl">
-                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Position</h4>
-                  <p className={`text-4xl font-black tracking-tighter my-4 ${weeklyStats.cashBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {formatCurrency(weeklyStats.cashBalance)}
-                  </p>
-                  <div className="bg-white/10 p-3 rounded-2xl text-[10px] text-gray-300 font-bold text-center uppercase tracking-widest flex items-center justify-center gap-2">
-                      {weeklyStats.cashBalance < 0 && <AlertTriangle size={12} className="text-rose-400" />}
-                      {weeklyStats.cashBalance < 0 ? 'Top-up Required' : 'Cash Surplus'}
-                  </div>
+                    <div>
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Position</h4>
+                        <p className={`text-4xl font-black tracking-tighter my-4 ${weeklyStats.cashBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {formatCurrency(weeklyStats.cashBalance)}
+                        </p>
+                        <div className="bg-white/10 p-3 rounded-2xl text-[10px] text-gray-300 font-bold text-center uppercase tracking-widest flex items-center justify-center gap-2">
+                            {weeklyStats.cashBalance < 0 && <AlertTriangle size={12} className="text-rose-400" />}
+                            {weeklyStats.cashBalance < 0 ? 'Top-up Required' : 'Cash Surplus'}
+                        </div>
+                    </div>
+                    
+                    {/* Reconcile Button */}
+                     <button 
+                        onClick={handleReconcileCash}
+                        className="mt-4 w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-white/5"
+                    >
+                        <RefreshCw size={14} /> Reconcile Position
+                    </button>
                 </div>
               </div>
 

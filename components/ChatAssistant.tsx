@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Type, FunctionDeclaration, Schema } from "@google/genai";
-import { MessageCircle, X, Send, Sparkles, Loader2, Bot } from 'lucide-react';
+import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
+import { X, Send, Sparkles, Loader2, Bot } from 'lucide-react';
 import { Transaction, Category, TransactionType, AccountType } from '../types';
 
 interface ChatAssistantProps {
@@ -74,29 +74,28 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ transactions, categories,
         3. Be concise and friendly.
       `;
 
-      const model = ai.models.getGenerativeModel({
-        model: 'gemini-3-pro-preview',
-        systemInstruction: systemInstruction,
-        tools: [{ functionDeclarations: [addTransactionTool] }]
-      });
-
       // Simple chat history management (last 10 messages)
       const chatHistory = messages.slice(-10).map(m => ({
           role: m.role,
           parts: [{ text: m.text }]
       }));
 
-      const chat = model.startChat({
-        history: chatHistory
+      const chat = ai.chats.create({
+        model: 'gemini-3-pro-preview',
+        history: chatHistory,
+        config: {
+            systemInstruction: systemInstruction,
+            tools: [{ functionDeclarations: [addTransactionTool] }]
+        }
       });
 
-      const result = await chat.sendMessage(userMsg);
-      const response = await result.response;
+      const response = await chat.sendMessage({ message: userMsg });
       
       // Handle Function Calls
-      const call = response.functionCalls()?.[0];
+      const calls = response.functionCalls;
       
-      if (call) {
+      if (calls && calls.length > 0) {
+         const call = calls[0];
          if (call.name === 'addTransaction') {
              const args = call.args as any;
              
@@ -112,17 +111,20 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ transactions, categories,
              });
 
              // Send success back to model to generate confirmation text
-             const functionResponse = await chat.sendMessage([{
-                functionResponse: {
-                    name: 'addTransaction',
-                    response: { result: 'Transaction successfully added to the database.' }
-                }
-             }]);
+             const functionResponse = await chat.sendMessage({
+                message: [{
+                    functionResponse: {
+                        name: 'addTransaction',
+                        response: { result: 'Transaction successfully added to the database.' },
+                        id: call.id
+                    }
+                }]
+             });
              
-             setMessages(prev => [...prev, { role: 'model', text: functionResponse.response.text() }]);
+             setMessages(prev => [...prev, { role: 'model', text: functionResponse.text || 'Transaction added.' }]);
          }
       } else {
-          setMessages(prev => [...prev, { role: 'model', text: response.text() }]);
+          setMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
       }
 
     } catch (error) {
