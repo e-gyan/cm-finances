@@ -8,6 +8,7 @@ import Overview from './components/Overview';
 import Transactions from './components/Transactions';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
+import ChatAssistant from './components/ChatAssistant';
 
 // Helper to load from storage or fallback
 const loadState = <T,>(key: string, fallback: T): T => {
@@ -421,6 +422,14 @@ function App() {
           </div>
         </div>
       </main>
+
+      {/* GLOBAL CHAT ASSISTANT */}
+      <ChatAssistant 
+          transactions={transactions} 
+          categories={categories} 
+          onAddTransaction={addTransaction}
+      />
+
     </div>
   );
 }

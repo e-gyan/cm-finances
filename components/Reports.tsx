@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, TransactionType, User, AccountType } from '../types';
-import { formatCurrency } from '../utils';
-import { FileText, Calendar, TrendingUp, TrendingDown, Plus, Save, Trash2, Download, PieChart, ChevronDown, BarChart2, Target, MessageCircle, AlertTriangle, X, Check, User as UserIcon, Send } from 'lucide-react';
+import { formatCurrency, getGreeting } from '../utils';
+import { FileText, Calendar, TrendingUp, TrendingDown, Plus, Save, Trash2, Download, PieChart, ChevronDown, BarChart2, Target, MessageCircle, AlertTriangle, X, Check, User as UserIcon, Send, Sparkles, Loader2 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   Cell
@@ -27,6 +28,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const [selectedFinanceRep, setSelectedFinanceRep] = useState<string>(''); // Name of Finance person
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<string>(''); // Name of person receiving MoMo
   const [beneficiaryNumber, setBeneficiaryNumber] = useState<string>(''); // Number of person receiving MoMo
+
+  // AI Loading State
+  const [isAutoPlanning, setIsAutoPlanning] = useState(false);
 
   // --- Weekly Input States ---
   const [offeringsInput, setOfferingsInput] = useState<{type: 'CASH' | 'MOMO', amount: string}[]>([
@@ -162,6 +166,57 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const handleAddPlanInput = () => setPlanInput([...planInput, { item: '', cost: '' }]);
   const handleRemovePlanInput = (idx: number) => setPlanInput(planInput.filter((_, i) => i !== idx));
 
+  // --- AI HANDLER ---
+  const handleAutoPlan = async () => {
+      setIsAutoPlanning(true);
+      try {
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          
+          // Gather last 20 expense transactions for context
+          const historyContext = transactions
+            .filter(t => t.type === TransactionType.EXPENSE && t.category === 'Snacks & Meals')
+            .slice(0, 20)
+            .map(t => `${t.notes || 'Expense'}: ${t.amount} GHS`)
+            .join('\n');
+
+          const response = await ai.models.generateContent({
+             model: "gemini-3-flash-preview",
+             contents: `Based on these recent expense records, suggest 3-5 likely items for this week's plan with estimated costs. Return ONLY valid JSON.
+             
+             History:
+             ${historyContext}`,
+             config: {
+                 responseMimeType: "application/json",
+                 responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            item: { type: Type.STRING },
+                            cost: { type: Type.STRING } // Keeping as string to match input state
+                        }
+                    }
+                 }
+             }
+          });
+
+          const jsonText = response.text;
+          const suggestions = JSON.parse(jsonText);
+          
+          if (Array.isArray(suggestions) && suggestions.length > 0) {
+              setPlanInput(suggestions);
+          } else {
+              alert("AI couldn't find a pattern, try adding items manually.");
+          }
+
+      } catch (e) {
+          console.error(e);
+          alert("Failed to generate smart plan. Please check API Key.");
+      } finally {
+          setIsAutoPlanning(false);
+      }
+  };
+
   const saveWeeklyData = () => {
     const today = new Date().toISOString().split('T')[0];
     const batchToAdd: Omit<Transaction, 'id'>[] = [];
@@ -238,13 +293,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       //text += `MoMo: ${formatCurrency(weeklyStats.snacks.momo)}\n\n`;
       
       //text += `*SUMMARY*\n`;
-      text += `Cash Balance: ${formatCurrency(weeklyStats.cashBalance)}\n`; // Explicitly show Cash Balance
+      text += `Cash Balance: ${formatCurrency(weeklyStats.cashBalance)}\n\n`; // Explicitly show Cash Balance
       
       if (weeklyStats.cashBalance < 0 && selectedFinanceRep) {
            //text += `\n*URGENT REQUEST*\n`;
            text += `Dear ${selectedFinanceRep},\n`;
            text += `We have a deficit of *${formatCurrency(Math.abs(weeklyStats.cashBalance))}* for this week's purchases.\n`;
-           text += `Please kindly transfer this amount via MoMo to:\n`;
+           text += `Kindly transfer this amount via MoMo to:\n`;
            text += `*Name:* ${selectedBeneficiary}\n`;
            text += `*Number:* ${beneficiaryNumber}\n\n`;
            text += `Thank you for you time and God bless you\n`;
@@ -437,11 +492,24 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                 </div>
 
                 {/* Planning Inputs */}
-                <div className="bg-white border-2 border-primary/5 rounded-[2rem] shadow-sm p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2.5 bg-primary/5 rounded-xl text-primary"><PieChart size={20}/></div>
-                    <h3 className="font-black text-primary uppercase tracking-widest text-xs">Expenses</h3>
+                <div className="bg-white border-2 border-primary/5 rounded-[2rem] shadow-sm p-6 relative">
+                  <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-primary/5 rounded-xl text-primary"><PieChart size={20}/></div>
+                        <h3 className="font-black text-primary uppercase tracking-widest text-xs">Expenses</h3>
+                      </div>
+                      
+                      {/* AI AUTO PLAN BUTTON */}
+                      <button 
+                        onClick={handleAutoPlan} 
+                        disabled={isAutoPlanning}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-violet-200 transition-colors disabled:opacity-50"
+                      >
+                         {isAutoPlanning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                         {isAutoPlanning ? 'Thinking...' : 'Smart Plan'}
+                      </button>
                   </div>
+
                   <div className="space-y-4">
                     {planInput.map((entry, idx) => (
                       <div key={idx} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex flex-col gap-2">
