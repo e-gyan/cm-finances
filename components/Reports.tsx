@@ -222,7 +222,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   };
 
   const generateAndOpenWhatsApp = () => {
-    let text = `*CM ${activeTab} Finance Report*\n`;
+    let text = `*CM ${activeTab} Report*\n`;
     text += `${new Date().toLocaleDateString()}\n`;
     text += `---------------------------\n`;
 
@@ -234,19 +234,20 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       text += `MoMo: ${formatCurrency(weeklyStats.offerings.momo)}\n\n`;
       
       text += `*EXPENSES*\n`;
-      text += `Cash: ${formatCurrency(weeklyStats.snacks.cash)}\n`;
+      text += `Cash: ${formatCurrency(weeklyStats.snacks.cash)}\n\n`;
       //text += `MoMo: ${formatCurrency(weeklyStats.snacks.momo)}\n\n`;
       
-      text += `*SUMMARY*\n`;
+      //text += `*SUMMARY*\n`;
       text += `Cash Balance: ${formatCurrency(weeklyStats.cashBalance)}\n`; // Explicitly show Cash Balance
       
       if (weeklyStats.cashBalance < 0 && selectedFinanceRep) {
-           text += `\n*URGENT REQUEST*\n`;
+           //text += `\n*URGENT REQUEST*\n`;
            text += `Dear ${selectedFinanceRep},\n`;
-           text += `We have a deficit of *${formatCurrency(Math.abs(weeklyStats.cashBalance))}* for this week's activities.\n`;
+           text += `We have a deficit of *${formatCurrency(Math.abs(weeklyStats.cashBalance))}* for this week's purchases.\n`;
            text += `Please kindly transfer this amount via MoMo to:\n`;
            text += `*Name:* ${selectedBeneficiary}\n`;
-           text += `*Number:* ${beneficiaryNumber}\n`;
+           text += `*Number:* ${beneficiaryNumber}\n\n`;
+           text += `Thank you for you time and God bless you\n`;
       } else {
            text += `Net Position: ${formatCurrency(weeklyStats.totalIncome - weeklyStats.totalExpense)}\n`;
       }
