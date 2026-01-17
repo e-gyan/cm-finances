@@ -220,7 +220,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const handleReconcileCash = () => {
     const balance = weeklyStats.cashBalance;
     if (balance === 0) {
-        alert("Cash position is balanced. No transfer needed.");
+        alert("Cash position is balanced. No reconciliation needed.");
         return;
     }
 
@@ -229,16 +229,19 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     
     // Prompt for confirmation
     const message = isSurplus 
-        ? `Surplus of ${formatCurrency(amount)} detected.\n\nAction: Transfer remaining cash to MoMo Receivables.`
-        : `Deficit of ${formatCurrency(amount)} detected.\n\nAction: Transfer from MoMo Receivables to cover cash expenses.`;
+        ? `Surplus of ${formatCurrency(amount)} detected.\n\nAction: Transfer surplus FROM Cash TO MoMo Receivables.`
+        : `Deficit of ${formatCurrency(amount)} detected.\n\nAction: Transfer deficit FROM MoMo Receivables TO Cash (to cover expenses).`;
 
     if (!window.confirm(message)) return;
 
+    // Logic: Transfer transaction
     const transaction: Omit<Transaction, 'id'> = {
         date: selectedWeekDate, // Use calculation date
         type: TransactionType.TRANSFER,
         category: 'Finance Transfer',
         amount: amount,
+        // Surplus: From Cash -> To MoMo
+        // Deficit: From MoMo -> To Cash
         accountId: isSurplus ? AccountType.CASH : AccountType.MOMO,
         toAccountId: isSurplus ? AccountType.MOMO : AccountType.CASH,
         notes: isSurplus 
@@ -248,7 +251,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     };
 
     onAddTransaction(transaction);
-    alert("Reconciliation transfer added successfully.");
+    alert(`Reconciliation Transfer recorded successfully.\n\nFrom: ${transaction.accountId}\nTo: ${transaction.toAccountId}\nAmount: ${formatCurrency(amount)}`);
   };
 
   const saveWeeklyData = () => {
@@ -271,15 +274,18 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     const validPlanItems = planInput.filter(p => p.item && p.cost && Number(p.cost) > 0);
     if (validPlanItems.length > 0) {
       const totalCost = validPlanItems.reduce((acc, p) => acc + Number(p.cost), 0);
+      // Create breakdown metadata for individual listing later
+      const breakdown = validPlanItems.map(p => ({ item: p.item, amount: Number(p.cost) }));
+      
       batchToAdd.push({
         date: today,
         type: TransactionType.EXPENSE,
         category: 'Snacks & Meals',
         amount: totalCost,
         accountId: AccountType.CASH,
-        notes: `Planned: ${validPlanItems.map(p => p.item).join(', ')}`,
+        notes: `Weekly Expenses: ${validPlanItems.map(p => p.item).join(', ')}`,
         isArchived: false,
-        meta: { isPlan: true }
+        meta: { isPlan: true, breakdown: breakdown } // Store breakdown in meta
       });
     }
 
@@ -323,10 +329,33 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       text += `MoMo: ${formatCurrency(weeklyStats.offerings.momo)}\n\n`;
       
       text += `*EXPENSES*\n`;
-      text += `Cash: ${formatCurrency(weeklyStats.snacks.cash)}\n\n`;
-      //text += `MoMo: ${formatCurrency(weeklyStats.snacks.momo)}\n\n`;
+      // Gather expenses for the week to list individually
+      const { start, end } = getWeekRange(selectedWeekDate);
+      const weeklyExpenses = transactions.filter(t => {
+        const d = new Date(t.date);
+        return !t.isArchived && d >= start && d <= end && t.type === TransactionType.EXPENSE;
+      });
+
+      if (weeklyExpenses.length > 0) {
+          weeklyExpenses.forEach(t => {
+              // Check for detailed breakdown in metadata first
+              if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
+                  t.meta.breakdown.forEach((item: {item: string, amount: number}) => {
+                      text += `- ${item.item}: ${formatCurrency(item.amount)}\n`;
+                  });
+              } else {
+                  // Fallback for transactions without detailed breakdown
+                  const desc = t.notes ? t.notes : t.category;
+                  text += `- ${desc}: ${formatCurrency(t.amount)}\n`;
+              }
+          });
+      } else {
+          text += `No expenses recorded.\n`;
+      }
       
-      //text += `*SUMMARY*\n`;
+      text += `\n*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
+      
+      text += `*SUMMARY*\n`;
       text += `Cash Balance: ${formatCurrency(weeklyStats.cashBalance)}\n\n`; // Explicitly show Cash Balance
       
       if (weeklyStats.cashBalance < 0 && selectedFinanceRep) {

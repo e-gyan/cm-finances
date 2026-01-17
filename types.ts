@@ -24,6 +24,7 @@ export interface Transaction {
   meta?: {
     receivedFromFinance?: boolean; // For MoMo expenses
     isPlan?: boolean; // If created from "Plan Next Week"
+    breakdown?: { item: string; amount: number }[]; // For weekly plan breakdown
   };
 }
 
