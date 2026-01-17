@@ -51,7 +51,7 @@ const HistoryList = React.memo(({
                             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[80px]">{t.accountId}</span>
                         </div>
                         <h4 className={`font-bold leading-tight truncate text-sm md:text-base ${t.isArchived ? 'text-gray-500' : 'text-gray-800'}`}>{t.category}</h4>
-                        {t.notes && <p className="text-[10px] md:text-xs text-gray-400 mt-0.5 italic line-clamp-1">{t.notes}</p>}
+                        {t.notes && <p className="text-[10px] md:text-xs text-gray-500 mt-0.5 font-medium line-clamp-1">{t.notes}</p>}
                     </div>
                     <div className="text-right whitespace-nowrap">
                         <p className={`text-lg md:text-xl font-black tracking-tighter ${
@@ -89,12 +89,12 @@ const EntryForm = ({
 }: any) => {
   return (
     <>
-      <div className="flex border-b border-gray-100 overflow-x-auto no-scrollbar bg-gray-50/30">
+      <div className="flex flex-wrap border-b border-gray-100 bg-gray-50/30">
           {(['INCOME', 'EXPENSE', 'TRANSFER'] as TabType[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 min-w-[100px] py-4 md:py-6 text-[10px] font-black tracking-widest transition-all outline-none relative uppercase ${
+              className={`flex-1 min-w-[33%] py-4 md:py-6 text-[10px] font-black tracking-widest transition-all outline-none relative uppercase ${
                 activeTab === tab 
                   ? tab === 'INCOME' ? 'text-emerald-600' : tab === 'EXPENSE' ? 'text-rose-600' : 'text-blue-600'
                   : 'text-gray-400 hover:text-gray-600'
@@ -102,7 +102,7 @@ const EntryForm = ({
             >
               {tab}
               {activeTab === tab && (
-                <div className={`absolute bottom-0 left-0 right-0 h-1 mx-8 rounded-t-full animate-in slide-in-from-bottom-2 duration-300 ${
+                <div className={`absolute bottom-0 left-0 right-0 h-1 mx-4 md:mx-8 rounded-t-full animate-in slide-in-from-bottom-2 duration-300 ${
                   tab === 'INCOME' ? 'bg-emerald-500' : tab === 'EXPENSE' ? 'bg-rose-500' : 'bg-blue-500'
                 }`} />
               )}
@@ -184,13 +184,13 @@ const EntryForm = ({
                        </div>
                    ) : (
                        <div>
-                           <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Recipient (Optional)</label>
-                           <input 
-                                type="text"
-                                placeholder="Name"
-                                value={entry.recipient}
-                                onChange={(e) => updateEntry(index, 'recipient', e.target.value)}
+                           <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Notes / Description</label>
+                           <textarea
+                                placeholder="Enter description or recipient details..."
+                                value={entry.notes}
+                                onChange={(e) => updateEntry(index, 'notes', e.target.value)}
                                 className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none transition-shadow duration-200"
+                                rows={1}
                             />
                        </div>
                    )}
@@ -310,8 +310,8 @@ const Transactions: React.FC<TransactionsProps> = ({
                 category: entry.category,
                 accountId: entry.accountId,
                 toAccountId: activeTab === 'TRANSFER' ? entry.toAccountId : undefined,
-                recipient: entry.recipient,
-                notes: entry.notes,
+                recipient: undefined, // Cleared out as requested
+                notes: entry.notes, // Using notes primary
                 isArchived: false,
                 meta: { receivedFromFinance: entry.receivedFromFinance }
             });

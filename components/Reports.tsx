@@ -288,12 +288,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     <div className="space-y-6">
       <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-100 overflow-x-auto no-scrollbar bg-gray-50/50">
+        <div className="flex flex-wrap border-b border-gray-100 bg-gray-50/50">
           {(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'] as ReportType[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 min-w-[100px] py-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative ${
+              className={`flex-1 min-w-[25%] py-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${
                 activeTab === tab ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
