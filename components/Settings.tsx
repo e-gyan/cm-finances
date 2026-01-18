@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Category, User, Transaction, AccountType, TransactionType } from '../types';
-import { Trash2, Plus, RefreshCw, Archive, Search, FileText, Edit2, Check, X, AlertTriangle, Database, Download, Upload, Cloud, Lock, Key, Shield, UserPlus, Power, Eye, EyeOff, Smartphone } from 'lucide-react';
+import { Trash2, Plus, RefreshCw, Archive, Search, FileText, Edit2, Check, X, AlertTriangle, Database, Download, Upload, Cloud, Lock, Key, Shield, UserPlus, Power, Eye, EyeOff, Smartphone, BookOpen, Map, Activity, GitMerge, Share2, Layers, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '../utils';
 
 interface SettingsProps {
@@ -38,7 +38,7 @@ const Settings: React.FC<SettingsProps> = ({
   onUpdateCloudConfig,
   onUserAction
 }) => {
-  const [activeSection, setActiveSection] = useState<'CATEGORIES' | 'USERS' | 'ARCHIVE' | 'CLOUD'>('CATEGORIES');
+  const [activeSection, setActiveSection] = useState<'CATEGORIES' | 'USERS' | 'ARCHIVE' | 'CLOUD' | 'DOCS'>('CATEGORIES');
   const [newCatName, setNewCatName] = useState('');
   const [newCatType, setNewCatType] = useState<'INCOME' | 'EXPENSE' | 'BOTH'>('EXPENSE');
   
@@ -212,6 +212,7 @@ const Settings: React.FC<SettingsProps> = ({
       { id: 'USERS', label: 'Users' },
       { id: 'ARCHIVE', label: 'Archives' },
       { id: 'CLOUD', label: 'Cloud Sync' },
+      { id: 'DOCS', label: 'System Manual' },
   ];
 
   const filteredArchive = useMemo(() => {
@@ -247,7 +248,7 @@ const Settings: React.FC<SettingsProps> = ({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 p-4 md:p-10">
+      <div className="flex-1 p-4 md:p-10 max-h-[calc(100vh-100px)] overflow-y-auto custom-scrollbar">
         
         {/* --- CATEGORIES SECTION --- */}
         {activeSection === 'CATEGORIES' && (
@@ -546,10 +547,9 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
         )}
 
-        {/* ... Cloud Section ... */}
+        {/* --- CLOUD SECTION --- */}
         {activeSection === 'CLOUD' && (
             <div className="space-y-8 animate-in fade-in duration-500">
-                {/* ... existing cloud logic ... */}
                 <div className="flex justify-between items-end border-b border-gray-100 pb-4">
                     <div>
                         <h3 className="text-xl md:text-2xl font-black text-gray-900 tracking-tighter uppercase">Cloud Integration</h3>
@@ -653,6 +653,145 @@ const Settings: React.FC<SettingsProps> = ({
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        )}
+
+        {/* --- SYSTEM DOCS (MANUAL) --- */}
+        {activeSection === 'DOCS' && (
+            <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
+                <div className="flex items-center gap-4 border-b border-gray-100 pb-6">
+                    <div className="p-4 bg-primary/5 rounded-2xl text-primary">
+                        <BookOpen size={32} />
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">System Specification & User Manual</h3>
+                        <p className="text-sm font-medium text-gray-400 mt-1">Comprehensive guide to system architecture and user workflows.</p>
+                    </div>
+                </div>
+
+                {/* 1. System Overview */}
+                <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100">
+                    <h4 className="flex items-center gap-2 text-sm font-black text-gray-900 uppercase tracking-widest mb-4">
+                        <Activity size={16} className="text-primary"/> 1. System Overview
+                    </h4>
+                    <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                        The <strong>Thesaurus CM Finance App</strong> is a bespoke Progressive Web Application (PWA) designed to digitize the Children's Ministry financial operations. It replaces Excel-based workflows with a secure, real-time ledger system that handles income tracking, expense management, and automated reporting.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                        <div className="bg-white p-4 rounded-2xl border border-gray-100">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Architecture</span>
+                            <span className="font-bold text-gray-800 text-sm">React 19 + TypeScript (Frontend)</span>
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl border border-gray-100">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Storage Strategy</span>
+                            <span className="font-bold text-gray-800 text-sm">Hybrid: LocalStorage + JSONBin Cloud Sync</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 2. Core Modules */}
+                <div className="space-y-6">
+                     <h4 className="flex items-center gap-2 text-sm font-black text-gray-900 uppercase tracking-widest px-2">
+                        <Layers size={16} className="text-primary"/> 2. Core Functional Modules
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-6 border border-gray-200 rounded-[2rem] hover:border-primary/30 transition-colors group">
+                            <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors"><Map size={20}/></div>
+                            <h5 className="font-bold text-gray-900 mb-2">Dashboard (Overview)</h5>
+                            <ul className="text-xs text-gray-500 space-y-2 list-disc pl-4">
+                                <li>Real-time visualization of Income vs. Expenses.</li>
+                                <li>Net Balance calculation across fiscal periods.</li>
+                                <li>Account-specific breakdowns (Cash vs. MoMo).</li>
+                            </ul>
+                        </div>
+
+                        <div className="p-6 border border-gray-200 rounded-[2rem] hover:border-primary/30 transition-colors group">
+                            <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-rose-100 transition-colors"><FileText size={20}/></div>
+                            <h5 className="font-bold text-gray-900 mb-2">Ledger (Transactions)</h5>
+                            <ul className="text-xs text-gray-500 space-y-2 list-disc pl-4">
+                                <li><strong>Batch Entry System:</strong> Add multiple records simultaneously.</li>
+                                <li><strong>Classification:</strong> Smart categorization (Income/Expense/Transfer).</li>
+                                <li><strong>Audit Trail:</strong> View, Edit, and Archive capabilities with soft-delete safety.</li>
+                            </ul>
+                        </div>
+
+                        <div className="p-6 border border-gray-200 rounded-[2rem] hover:border-primary/30 transition-colors group">
+                             <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors"><GitMerge size={20}/></div>
+                            <h5 className="font-bold text-gray-900 mb-2">Reporting & Reconciliation</h5>
+                            <ul className="text-xs text-gray-500 space-y-2 list-disc pl-4">
+                                <li><strong>Weekly Analysis:</strong> Specialized view for Sunday Offerings vs. Weekly Expenses.</li>
+                                <li><strong>Auto-Reconciliation:</strong> Logic to handle Surplus (Transfer to Finance) vs. Deficit (Request from Finance).</li>
+                                <li><strong>WhatsApp Integration:</strong> One-click generation of formatted financial reports.</li>
+                            </ul>
+                        </div>
+                        
+                         <div className="p-6 border border-gray-200 rounded-[2rem] hover:border-primary/30 transition-colors group">
+                             <div className="w-10 h-10 bg-violet-50 text-violet-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-violet-100 transition-colors"><ShieldCheck size={20}/></div>
+                            <h5 className="font-bold text-gray-900 mb-2">Admin & Security</h5>
+                            <ul className="text-xs text-gray-500 space-y-2 list-disc pl-4">
+                                <li><strong>Cloud Sync:</strong> Encrypted JSON storage via JSONBin.io.</li>
+                                <li><strong>User Management:</strong> Role-based access control (Admin, Finance Rep, Viewer).</li>
+                                <li><strong>Archives:</strong> Recovery system for deleted records.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 3. The "Sunday Flow" User Journey */}
+                <div className="bg-gray-900 text-white p-8 rounded-[2.5rem] shadow-2xl">
+                    <h4 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest mb-6 text-emerald-400">
+                        <Activity size={16}/> 3. The "Sunday Flow" User Journey
+                    </h4>
+                    
+                    <div className="space-y-8 relative before:absolute before:left-4 before:top-4 before:bottom-4 before:w-0.5 before:bg-gray-700">
+                        <div className="relative pl-12">
+                            <div className="absolute left-0 top-0 w-8 h-8 bg-gray-800 border-2 border-emerald-500 rounded-full flex items-center justify-center text-xs font-bold">1</div>
+                            <h5 className="font-bold text-lg mb-1">Data Entry</h5>
+                            <p className="text-xs text-gray-400 leading-relaxed">
+                                Log <strong>Sunday Offerings</strong> (Cash & MoMo) via the Transactions tab. Input expected weekly expenses (Snacks, Transport, etc.).
+                            </p>
+                        </div>
+
+                        <div className="relative pl-12">
+                            <div className="absolute left-0 top-0 w-8 h-8 bg-gray-800 border-2 border-emerald-500 rounded-full flex items-center justify-center text-xs font-bold">2</div>
+                            <h5 className="font-bold text-lg mb-1">Review Weekly Report</h5>
+                            <p className="text-xs text-gray-400 leading-relaxed">
+                                Navigate to the <strong>Reports</strong> tab. The system aggregates all entries for the week, calculating Total Income, Total Expense, and the critical <strong>Cash Balance</strong>.
+                            </p>
+                        </div>
+
+                        <div className="relative pl-12">
+                            <div className="absolute left-0 top-0 w-8 h-8 bg-gray-800 border-2 border-emerald-500 rounded-full flex items-center justify-center text-xs font-bold">3</div>
+                            <h5 className="font-bold text-lg mb-1">Reconciliation Decision</h5>
+                            <p className="text-xs text-gray-400 leading-relaxed mb-3">The system automatically detects the financial position:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="bg-gray-800 p-3 rounded-xl border border-gray-700">
+                                    <span className="text-emerald-400 text-[10px] font-black uppercase block mb-1">Scenario A: Surplus</span>
+                                    <p className="text-[10px] text-gray-300">Cash Balance > 0. Action: Initiate Transfer transaction moving excess Cash to MoMo (Finance).</p>
+                                </div>
+                                <div className="bg-gray-800 p-3 rounded-xl border border-gray-700">
+                                    <span className="text-rose-400 text-[10px] font-black uppercase block mb-1">Scenario B: Deficit</span>
+                                    <p className="text-[10px] text-gray-300">Cash Balance &lt; 0. Action: System flags need for top-up. Create Transfer from MoMo to Cash.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="relative pl-12">
+                            <div className="absolute left-0 top-0 w-8 h-8 bg-gray-800 border-2 border-emerald-500 rounded-full flex items-center justify-center text-xs font-bold">4</div>
+                            <h5 className="font-bold text-lg mb-1">Communication</h5>
+                            <p className="text-xs text-gray-400 leading-relaxed">
+                                Click <strong>Share on WhatsApp</strong>. 
+                                If in Deficit, the app auto-generates a formal request message to the Finance Rep including the beneficiary details. 
+                                If in Surplus, it generates a standard financial report.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="text-center pt-8 border-t border-gray-100">
+                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Thesaurus System V2.1 • Internal Use Only</p>
                 </div>
             </div>
         )}
