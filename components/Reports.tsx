@@ -77,23 +77,46 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     const totalIncome = weekTrans.filter(t => t.type === TransactionType.INCOME).reduce((acc, t) => acc + t.amount, 0);
     const totalExpense = weekTrans.filter(t => t.type === TransactionType.EXPENSE).reduce((acc, t) => acc + t.amount, 0);
     
-    // Cash Specifics
-    const cashIncome = offerings.filter(t => t.accountId === AccountType.CASH).reduce((acc, t) => acc + t.amount, 0);
-    const cashExpense = snacks.filter(t => t.accountId === AccountType.CASH).reduce((acc, t) => acc + t.amount, 0);
-    const cashBalance = cashIncome - cashExpense;
+    // Breakdown for specific cards (Offerings vs Snacks)
+    const offeringsCash = offerings.filter(t => t.accountId === AccountType.CASH).reduce((acc, t) => acc + t.amount, 0);
+    const offeringsMomo = offerings.filter(t => t.accountId === AccountType.MOMO).reduce((acc, t) => acc + t.amount, 0);
+    
+    const snacksCash = snacks.filter(t => t.accountId === AccountType.CASH).reduce((acc, t) => acc + t.amount, 0);
+    const snacksMomo = snacks.filter(t => t.accountId === AccountType.MOMO).reduce((acc, t) => acc + t.amount, 0);
+    
+    // COMPREHENSIVE Cash Balance Calculation (Includes ALL categories and Transfers)
+    const cashBalance = weekTrans.reduce((acc, t) => {
+        // Cash Inflow
+        if (t.accountId === AccountType.CASH && t.type === TransactionType.INCOME) {
+            return acc + t.amount;
+        }
+        // Cash Outflow
+        if (t.accountId === AccountType.CASH && t.type === TransactionType.EXPENSE) {
+            return acc - t.amount;
+        }
+        // Transfer Out (From Cash)
+        if (t.type === TransactionType.TRANSFER && t.accountId === AccountType.CASH) {
+            return acc - t.amount;
+        }
+        // Transfer In (To Cash)
+        if (t.type === TransactionType.TRANSFER && t.toAccountId === AccountType.CASH) {
+            return acc + t.amount;
+        }
+        return acc;
+    }, 0);
 
     return {
         totalIncome,
         totalExpense,
         offerings: {
-          cash: cashIncome,
-          momo: offerings.filter(t => t.accountId === AccountType.MOMO).reduce((acc, t) => acc + t.amount, 0)
+          cash: offeringsCash,
+          momo: offeringsMomo
         },
         snacks: {
-          cash: cashExpense,
-          momo: snacks.filter(t => t.accountId === AccountType.MOMO).reduce((acc, t) => acc + t.amount, 0)
+          cash: snacksCash,
+          momo: snacksMomo
         },
-        cashBalance, // The "Spent Value" or "Net Position" requested
+        cashBalance, // The "True" Cash Position
         range: `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`
     };
   }, [transactions, selectedWeekDate]);
@@ -356,16 +379,16 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       text += `\n*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
       
       text += `*SUMMARY*\n`;
-      text += `Cash Balance: ${formatCurrency(weeklyStats.cashBalance)}\n\n`; // Explicitly show Cash Balance
+      text += `Cash Balance: ${formatCurrency(weeklyStats.cashBalance)}\n\n`;
       
       if (weeklyStats.cashBalance < 0 && selectedFinanceRep) {
-           //text += `\n*URGENT REQUEST*\n`;
-           text += `Dear ${selectedFinanceRep},`;
-           text += `We have a deficit of *${formatCurrency(Math.abs(weeklyStats.cashBalance))}* for this week's purchases.\n`;
-           text += `Please kindly transfer this amount via MoMo to:\n`;
-           text += `*Name:* ${selectedBeneficiary}\n`;
-           text += `*Number:* ${beneficiaryNumber}\n\n`;
-           text += `Thank you for you time and God bless you\n`;
+           text += `Dear ${selectedFinanceRep}, \n`;
+           text += `Could you kindly send *${formatCurrency(Math.abs(weeklyStats.cashBalance))}* to ${beneficiaryNumber} (${selectedBeneficiary})`;
+           text += `for the purchase of the above for CM?\n\n`;
+           text += `Thank you very much. God bless you.\n\n`;
+      } else if (weeklyStats.cashBalance > 0) {
+           //text += `*Action Required:*\n`;
+           text += `The remaining cash balance of ${formatCurrency(weeklyStats.cashBalance)} will be transferred to Finance.\n`;
       } else {
            text += `Net Position: ${formatCurrency(weeklyStats.totalIncome - weeklyStats.totalExpense)}\n`;
       }
