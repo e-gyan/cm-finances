@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Category, User, Transaction, AccountType, TransactionType } from '../types';
-import { Trash2, Plus, RefreshCw, Archive, Search, FileText, Edit2, Check, X, AlertTriangle, Database, Download, Upload, Cloud, Lock, Key, Shield, UserPlus, Power, Eye, EyeOff, Smartphone, BookOpen, Map, Activity, GitMerge, Share2, Layers, ShieldCheck } from 'lucide-react';
+import { Trash2, Plus, RefreshCw, Archive, Search, FileText, Edit2, Check, X, AlertTriangle, Database, Download, Upload, Cloud, Lock, Key, Shield, UserPlus, Power, Eye, EyeOff, Smartphone, BookOpen, Map, Activity, GitMerge, Share2, Layers, ShieldCheck, LayoutTemplate, Lightbulb, Users, ArrowRight, MousePointerClick, Zap } from 'lucide-react';
 import { formatCurrency } from '../utils';
 
 interface SettingsProps {
@@ -38,7 +38,7 @@ const Settings: React.FC<SettingsProps> = ({
   onUpdateCloudConfig,
   onUserAction
 }) => {
-  const [activeSection, setActiveSection] = useState<'CATEGORIES' | 'USERS' | 'ARCHIVE' | 'CLOUD' | 'DOCS'>('CATEGORIES');
+  const [activeSection, setActiveSection] = useState<'CATEGORIES' | 'USERS' | 'ARCHIVE' | 'CLOUD' | 'DOCS' | 'PORTFOLIO'>('CATEGORIES');
   const [newCatName, setNewCatName] = useState('');
   const [newCatType, setNewCatType] = useState<'INCOME' | 'EXPENSE' | 'BOTH'>('EXPENSE');
   
@@ -213,6 +213,7 @@ const Settings: React.FC<SettingsProps> = ({
       { id: 'ARCHIVE', label: 'Archives' },
       { id: 'CLOUD', label: 'Cloud Sync' },
       { id: 'DOCS', label: 'System Manual' },
+      { id: 'PORTFOLIO', label: 'Product Case Study' },
   ];
 
   const filteredArchive = useMemo(() => {
@@ -347,7 +348,7 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
         )}
 
-        {/* --- USERS SECTION --- */}
+        {/* ... (USERS, ARCHIVE, CLOUD sections remain unchanged, included below to maintain file structure) ... */}
         {activeSection === 'USERS' && (
              <div className="space-y-8 animate-in fade-in duration-500">
                  <div className="flex justify-between items-end border-b border-gray-100 pb-4">
@@ -441,7 +442,6 @@ const Settings: React.FC<SettingsProps> = ({
              </div>
         )}
 
-        {/* --- ARCHIVE SECTION --- */}
         {activeSection === 'ARCHIVE' && (
              <div className="space-y-8 animate-in fade-in duration-500">
                  <div className="flex flex-col md:flex-row justify-between items-end border-b border-gray-100 pb-4 gap-4">
@@ -506,7 +506,6 @@ const Settings: React.FC<SettingsProps> = ({
              </div>
         )}
 
-        {/* --- ARCHIVE EDIT MODAL --- */}
         {isArchiveEditing && archiveEditForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white rounded-[2rem] p-6 md:p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
@@ -547,7 +546,6 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
         )}
 
-        {/* --- CLOUD SECTION --- */}
         {activeSection === 'CLOUD' && (
             <div className="space-y-8 animate-in fade-in duration-500">
                 <div className="flex justify-between items-end border-b border-gray-100 pb-4">
@@ -792,6 +790,161 @@ const Settings: React.FC<SettingsProps> = ({
 
                 <div className="text-center pt-8 border-t border-gray-100">
                     <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Thesaurus System V2.1 • Internal Use Only</p>
+                </div>
+            </div>
+        )}
+
+        {/* --- PORTFOLIO CASE STUDY --- */}
+        {activeSection === 'PORTFOLIO' && (
+            <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
+                {/* Hero */}
+                <div className="text-center py-10 border-b border-gray-100">
+                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full mb-6">
+                        <LayoutTemplate size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Product Case Study</span>
+                     </div>
+                     <h1 className="text-4xl md:text-6xl font-black text-gray-900 tracking-tighter mb-4">Thesaurus CM Finance</h1>
+                     <p className="text-lg text-gray-500 max-w-2xl mx-auto font-medium">
+                         Digitizing the financial operations of the Children's Ministry with a focus on accountability, speed, and automated reporting.
+                     </p>
+                </div>
+
+                {/* Problem & Solution */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/40 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-5">
+                            <AlertTriangle size={120} />
+                        </div>
+                        <h3 className="flex items-center gap-3 text-lg font-black uppercase tracking-wide text-rose-600 mb-4">
+                            <div className="p-2 bg-rose-50 rounded-lg"><AlertTriangle size={20}/></div>
+                            The Problem
+                        </h3>
+                        <p className="text-gray-600 leading-relaxed text-sm mb-4">
+                            The Ministry previously relied on <strong>manual Excel sheets</strong> and loose notes to track Sunday offerings and expenses. This led to:
+                        </p>
+                        <ul className="space-y-3">
+                            <li className="flex items-center gap-3 text-sm font-bold text-gray-700">
+                                <div className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Calculating errors in weekly cash balancing.
+                            </li>
+                            <li className="flex items-center gap-3 text-sm font-bold text-gray-700">
+                                <div className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Lack of real-time visibility for the Finance Director.
+                            </li>
+                            <li className="flex items-center gap-3 text-sm font-bold text-gray-700">
+                                <div className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Delayed reporting due to manual formatting for WhatsApp.
+                            </li>
+                        </ul>
+                     </div>
+
+                     <div className="bg-gray-900 p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden text-white">
+                        <div className="absolute top-0 right-0 p-8 opacity-10">
+                            <Lightbulb size={120} />
+                        </div>
+                        <h3 className="flex items-center gap-3 text-lg font-black uppercase tracking-wide text-emerald-400 mb-4">
+                            <div className="p-2 bg-white/10 rounded-lg"><Lightbulb size={20}/></div>
+                            The Solution
+                        </h3>
+                        <p className="text-gray-300 leading-relaxed text-sm mb-4">
+                            A <strong>Progressive Web App (PWA)</strong> tailored for mobile usage, ensuring volunteers can input data instantly.
+                        </p>
+                        <div className="grid grid-cols-2 gap-4 mt-6">
+                            <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                                <div className="text-2xl font-black text-emerald-400 mb-1">100%</div>
+                                <div className="text-[10px] uppercase tracking-widest text-gray-400">Paperless</div>
+                            </div>
+                            <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                                <div className="text-2xl font-black text-emerald-400 mb-1">&lt; 2min</div>
+                                <div className="text-[10px] uppercase tracking-widest text-gray-400">Reporting Time</div>
+                            </div>
+                        </div>
+                     </div>
+                </div>
+
+                {/* VISUAL GALLERY (Mockups) */}
+                <div className="bg-gray-50 py-12 px-6 rounded-[3rem] border border-gray-200">
+                    <div className="text-center mb-10">
+                        <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Interface Design</h3>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">Core User Experience Screens</p>
+                    </div>
+
+                    <div className="flex flex-wrap justify-center gap-8">
+                        {/* Screen 1: Dashboard */}
+                        <div className="w-[260px] h-[520px] bg-white rounded-[2.5rem] border-8 border-gray-800 shadow-2xl overflow-hidden relative flex flex-col">
+                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-800 rounded-b-xl z-20"></div>
+                             <div className="bg-gray-50 p-4 flex-1 flex flex-col gap-3 pt-10">
+                                 <div className="h-8 w-24 bg-gray-200 rounded-full mb-2"></div>
+                                 <div className="h-32 bg-emerald-100 rounded-3xl w-full"></div>
+                                 <div className="grid grid-cols-2 gap-2">
+                                     <div className="h-24 bg-rose-50 rounded-2xl"></div>
+                                     <div className="h-24 bg-blue-50 rounded-2xl"></div>
+                                 </div>
+                                 <div className="h-40 bg-white border border-gray-100 rounded-3xl mt-2 p-2">
+                                     <div className="h-full w-full bg-gray-100 rounded-xl opacity-50"></div>
+                                 </div>
+                             </div>
+                             <div className="absolute bottom-4 left-0 right-0 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Overview</div>
+                        </div>
+
+                        {/* Screen 2: Batch Entry */}
+                        <div className="w-[260px] h-[520px] bg-white rounded-[2.5rem] border-8 border-gray-800 shadow-2xl overflow-hidden relative flex flex-col">
+                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-800 rounded-b-xl z-20"></div>
+                             <div className="bg-gray-50 p-4 flex-1 flex flex-col gap-3 pt-10">
+                                 <div className="flex justify-between mb-2">
+                                     <div className="h-6 w-16 bg-emerald-500 rounded-full"></div>
+                                     <div className="h-6 w-16 bg-gray-200 rounded-full"></div>
+                                     <div className="h-6 w-16 bg-gray-200 rounded-full"></div>
+                                 </div>
+                                 <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-200 space-y-2">
+                                     <div className="h-8 bg-gray-50 rounded-lg w-full"></div>
+                                     <div className="h-8 bg-gray-50 rounded-lg w-full"></div>
+                                     <div className="h-8 bg-gray-50 rounded-lg w-full"></div>
+                                 </div>
+                                 <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-200 space-y-2 opacity-50">
+                                     <div className="h-8 bg-gray-50 rounded-lg w-full"></div>
+                                 </div>
+                                 <div className="mt-auto h-12 bg-emerald-600 rounded-xl w-full"></div>
+                             </div>
+                             <div className="absolute bottom-4 left-0 right-0 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Batch Ledger</div>
+                        </div>
+
+                         {/* Screen 3: Reports */}
+                        <div className="w-[260px] h-[520px] bg-white rounded-[2.5rem] border-8 border-gray-800 shadow-2xl overflow-hidden relative flex flex-col">
+                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-800 rounded-b-xl z-20"></div>
+                             <div className="bg-gray-50 p-4 flex-1 flex flex-col gap-3 pt-10">
+                                 <div className="h-6 w-32 bg-gray-200 rounded-md mb-2"></div>
+                                 <div className="h-20 bg-gray-900 rounded-2xl w-full flex items-center justify-center">
+                                     <div className="h-8 w-8 rounded-full border-2 border-emerald-500"></div>
+                                 </div>
+                                 <div className="space-y-2">
+                                     <div className="h-10 bg-white border border-gray-200 rounded-xl w-full"></div>
+                                     <div className="h-10 bg-white border border-gray-200 rounded-xl w-full"></div>
+                                 </div>
+                                 <div className="mt-auto h-12 bg-[#25D366] rounded-xl w-full flex items-center justify-center text-white text-[10px] font-black uppercase">Share Report</div>
+                             </div>
+                             <div className="absolute bottom-4 left-0 right-0 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reconciliation</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* User Flow Map */}
+                <div>
+                     <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-8">Sunday Operations Flow</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {[
+                            { icon: Users, title: 'Collection', desc: 'Ushers collect offerings & take attendance.' },
+                            { icon: MousePointerClick, title: 'Batch Input', desc: 'Finance Rep logs total cash & momo into app.' },
+                            { icon: Zap, title: 'Auto-Calc', desc: 'System calculates balance & flags deficit/surplus.' },
+                            { icon: Share2, title: 'Broadcast', desc: 'One-click WhatsApp report sent to Director.' },
+                        ].map((step, i) => (
+                            <div key={i} className="relative p-6 bg-white border border-gray-200 rounded-[2rem] hover:border-primary/50 transition-colors group">
+                                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-primary group-hover:text-white transition-all mb-4">
+                                    <step.icon size={20} />
+                                </div>
+                                <h4 className="font-bold text-gray-900 mb-2">{step.title}</h4>
+                                <p className="text-xs text-gray-500 leading-relaxed">{step.desc}</p>
+                                {i < 3 && <ArrowRight className="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 text-gray-300 z-10 bg-white rounded-full p-0.5" size={20} />}
+                            </div>
+                        ))}
+                     </div>
                 </div>
             </div>
         )}
