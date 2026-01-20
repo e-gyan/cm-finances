@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, TransactionType, User, AccountType } from '../types';
 import { formatCurrency } from '../utils';
-import { FileText, Calendar, TrendingUp, TrendingDown, Plus, Save, Trash2, Download, PieChart, ChevronDown, BarChart2, Target, MessageCircle, AlertTriangle, X, Check, User as UserIcon, Send, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { FileText, Calendar, TrendingUp, TrendingDown, Plus, Save, Trash2, Download, PieChart, ChevronDown, BarChart2, Target, MessageCircle, AlertTriangle, X, Check, User as UserIcon, Send, Sparkles, Loader2, RefreshCw, ArrowRightLeft } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   Cell
@@ -25,9 +25,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
   // WhatsApp Request Flow State
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [selectedFinanceRep, setSelectedFinanceRep] = useState<string>(''); // Name of Finance person
-  const [selectedBeneficiary, setSelectedBeneficiary] = useState<string>(''); // Name of person receiving MoMo
-  const [beneficiaryNumber, setBeneficiaryNumber] = useState<string>(''); // Number of person receiving MoMo
+  const [selectedFinanceRep, setSelectedFinanceRep] = useState<string>(''); 
+  const [selectedBeneficiary, setSelectedBeneficiary] = useState<string>(''); 
+  const [beneficiaryNumber, setBeneficiaryNumber] = useState<string>(''); 
 
   // AI Loading State
   const [isAutoPlanning, setIsAutoPlanning] = useState(false);
@@ -70,60 +70,56 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       return !t.isArchived && d >= start && d <= end;
     });
 
-    const offerings = weekTrans.filter(t => t.category === 'Offerings & Tithes' && t.type === TransactionType.INCOME);
-    const snacks = weekTrans.filter(t => t.category === 'Snacks & Meals' && t.type === TransactionType.EXPENSE);
-    
-    // Calculate totals
+    // P&L TOTALS (Exclude Transfers)
     const totalIncome = weekTrans.filter(t => t.type === TransactionType.INCOME).reduce((acc, t) => acc + t.amount, 0);
     const totalExpense = weekTrans.filter(t => t.type === TransactionType.EXPENSE).reduce((acc, t) => acc + t.amount, 0);
     
-    // Breakdown for specific cards (Offerings vs Snacks)
+    // Detailed Breakdown
+    const offerings = weekTrans.filter(t => t.category === 'Offerings & Tithes' && t.type === TransactionType.INCOME);
+    const snacks = weekTrans.filter(t => t.category === 'Snacks & Meals' && t.type === TransactionType.EXPENSE);
+    
     const offeringsCash = offerings.filter(t => t.accountId === AccountType.CASH).reduce((acc, t) => acc + t.amount, 0);
     const offeringsMomo = offerings.filter(t => t.accountId === AccountType.MOMO).reduce((acc, t) => acc + t.amount, 0);
     
     const snacksCash = snacks.filter(t => t.accountId === AccountType.CASH).reduce((acc, t) => acc + t.amount, 0);
     const snacksMomo = snacks.filter(t => t.accountId === AccountType.MOMO).reduce((acc, t) => acc + t.amount, 0);
     
-    // COMPREHENSIVE Cash Balance Calculation (Includes ALL categories and Transfers)
+    // --- CASH POSITION LOGIC (Double Entry Aware) ---
     const cashBalance = weekTrans.reduce((acc, t) => {
-        // Cash Inflow
-        if (t.accountId === AccountType.CASH && t.type === TransactionType.INCOME) {
-            return acc + t.amount;
+        if (t.accountId === AccountType.CASH) {
+            // Money leaving Cash account
+            if (t.type === TransactionType.EXPENSE || t.type === TransactionType.TRANSFER) {
+                return acc - t.amount;
+            }
+            // Money entering Cash account (Direct Income)
+            if (t.type === TransactionType.INCOME) {
+                return acc + t.amount;
+            }
         }
-        // Cash Outflow
-        if (t.accountId === AccountType.CASH && t.type === TransactionType.EXPENSE) {
-            return acc - t.amount;
-        }
-        // Transfer Out (From Cash)
-        if (t.type === TransactionType.TRANSFER && t.accountId === AccountType.CASH) {
-            return acc - t.amount;
-        }
-        // Transfer In (To Cash)
+        
+        // Money entering Cash account (via Transfer from somewhere else)
         if (t.type === TransactionType.TRANSFER && t.toAccountId === AccountType.CASH) {
             return acc + t.amount;
         }
+        
         return acc;
     }, 0);
 
     return {
         totalIncome,
         totalExpense,
-        offerings: {
-          cash: offeringsCash,
-          momo: offeringsMomo
-        },
-        snacks: {
-          cash: snacksCash,
-          momo: snacksMomo
-        },
-        cashBalance, // The "True" Cash Position
+        offerings: { cash: offeringsCash, momo: offeringsMomo },
+        snacks: { cash: snacksCash, momo: snacksMomo },
+        cashBalance, 
         range: `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`
     };
   }, [transactions, selectedWeekDate]);
 
-  // --- Data Calculations: Analytical (Monthly/Quarterly/Yearly) ---
+  // --- Analytical Calculations ---
   const analyticalData = useMemo(() => {
-    let filtered = transactions.filter(t => !t.isArchived && new Date(t.date).getFullYear() === selectedYear);
+    // Filter out transfers for P&L Reporting
+    let filtered = transactions.filter(t => !t.isArchived && t.type !== TransactionType.TRANSFER && new Date(t.date).getFullYear() === selectedYear);
+    
     let chartData: { name: string, income: number, expense: number, sortOrder: number }[] = [];
     
     if (activeTab === 'MONTHLY') {
@@ -189,13 +185,10 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const handleAddPlanInput = () => setPlanInput([...planInput, { item: '', cost: '' }]);
   const handleRemovePlanInput = (idx: number) => setPlanInput(planInput.filter((_, i) => i !== idx));
 
-  // --- AI HANDLER ---
   const handleAutoPlan = async () => {
       setIsAutoPlanning(true);
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          
-          // Gather last 20 expense transactions for context
           const historyContext = transactions
             .filter(t => t.type === TransactionType.EXPENSE && t.category === 'Snacks & Meals')
             .slice(0, 20)
@@ -204,85 +197,28 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
           const response = await ai.models.generateContent({
              model: "gemini-3-flash-preview",
-             contents: `Based on these recent expense records, suggest 3-5 likely items for this week's plan with estimated costs. Return ONLY valid JSON.
-             
-             History:
-             ${historyContext}`,
-             config: {
-                 responseMimeType: "application/json",
-                 responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            item: { type: Type.STRING },
-                            cost: { type: Type.STRING } // Keeping as string to match input state
-                        }
-                    }
-                 }
-             }
+             contents: `Based on these recent expense records, suggest 3-4 likely items for this week's plan. Return JSON array. History: ${historyContext}`,
+             config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { item: { type: Type.STRING }, cost: { type: Type.STRING } } } } }
           });
-
-          const jsonText = response.text;
-          const suggestions = JSON.parse(jsonText);
-          
-          if (Array.isArray(suggestions) && suggestions.length > 0) {
-              setPlanInput(suggestions);
-          } else {
-              alert("AI couldn't find a pattern, try adding items manually.");
-          }
-
-      } catch (e) {
-          console.error(e);
-          alert("Failed to generate smart plan. Please check API Key.");
-      } finally {
-          setIsAutoPlanning(false);
-      }
+          setPlanInput(JSON.parse(response.text));
+      } catch (e) { console.error(e); alert("AI Auto-Plan failed."); } 
+      finally { setIsAutoPlanning(false); }
   };
 
   const handleReconcileCash = () => {
-    const balance = weeklyStats.cashBalance;
-    if (balance === 0) {
-        alert("Cash position is balanced. No reconciliation needed.");
-        return;
-    }
-
-    const isSurplus = balance > 0;
-    const amount = Math.abs(balance);
-    
-    // Prompt for confirmation
-    const message = isSurplus 
-        ? `Surplus of ${formatCurrency(amount)} detected.\n\nAction: Transfer surplus FROM Cash TO MoMo Receivables.`
-        : `Deficit of ${formatCurrency(amount)} detected.\n\nAction: Transfer deficit FROM MoMo Receivables TO Cash (to cover expenses).`;
-
-    if (!window.confirm(message)) return;
-
-    // Logic: Transfer transaction
-    const transaction: Omit<Transaction, 'id'> = {
-        date: selectedWeekDate, // Use calculation date
-        type: TransactionType.TRANSFER,
-        category: 'Finance Transfer',
-        amount: amount,
-        // Surplus: From Cash -> To MoMo
-        // Deficit: From MoMo -> To Cash
-        accountId: isSurplus ? AccountType.CASH : AccountType.MOMO,
-        toAccountId: isSurplus ? AccountType.MOMO : AccountType.CASH,
-        notes: isSurplus 
-            ? "Remaining cash offering after expenses at hand."
-            : "Transfer to support weekly purchases.",
-        isArchived: false
-    };
-
-    onAddTransaction(transaction);
-    alert(`Reconciliation Transfer recorded successfully.\n\nFrom: ${transaction.accountId}\nTo: ${transaction.toAccountId}\nAmount: ${formatCurrency(amount)}`);
+    // Legacy function - kept empty or repurposed if needed, 
+    // but primary logic is now auto-handled in saveWeeklyData.
+    alert("Reconciliation is now automated when you commit the weekly report.");
   };
 
   const saveWeeklyData = () => {
     const today = new Date().toISOString().split('T')[0];
     const batchToAdd: Omit<Transaction, 'id'>[] = [];
     
+    // 1. Process Offerings
     offeringsInput.forEach(entry => {
       if (entry.amount && Number(entry.amount) > 0) {
+        // Record Income
         batchToAdd.push({
           date: today,
           type: TransactionType.INCOME,
@@ -291,48 +227,58 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
           accountId: entry.type === 'CASH' ? AccountType.CASH : AccountType.MOMO,
           isArchived: false
         });
+
+        // 2. Auto-Sweep Logic: If Cash, Transfer to MoMo immediately
+        if (entry.type === 'CASH') {
+            batchToAdd.push({
+                date: today,
+                type: TransactionType.TRANSFER,
+                category: 'Finance Transfer',
+                amount: Number(entry.amount),
+                accountId: AccountType.CASH, // Source
+                toAccountId: AccountType.MOMO, // Dest
+                notes: 'Auto-sweep: Cash Offering to MoMo',
+                isArchived: false
+            });
+        }
       }
     });
 
+    // 3. Process Expenses (Recorded against MOMO now)
     const validPlanItems = planInput.filter(p => p.item && p.cost && Number(p.cost) > 0);
     if (validPlanItems.length > 0) {
       const totalCost = validPlanItems.reduce((acc, p) => acc + Number(p.cost), 0);
-      // Create breakdown metadata for individual listing later
-      const breakdown = validPlanItems.map(p => ({ item: p.item, amount: Number(p.cost) }));
-      
       batchToAdd.push({
         date: today,
         type: TransactionType.EXPENSE,
         category: 'Snacks & Meals',
         amount: totalCost,
-        accountId: AccountType.CASH,
+        accountId: AccountType.MOMO, // CHANGED FROM CASH TO MOMO
         notes: `Weekly Expenses: ${validPlanItems.map(p => p.item).join(', ')}`,
         isArchived: false,
-        meta: { isPlan: true, breakdown: breakdown } // Store breakdown in meta
+        meta: { isPlan: true, breakdown: validPlanItems.map(p => ({ item: p.item, amount: Number(p.cost) })) }
       });
     }
 
     if (batchToAdd.length > 0) {
       onAddTransaction(batchToAdd);
-      alert(`Saved ${batchToAdd.length} entries.`);
+      alert(`Saved ${batchToAdd.length} entries. Cash offerings have been auto-transferred to MoMo.`);
       setOfferingsInput([{ type: 'CASH', amount: '' }]);
       setPlanInput([{ item: '', cost: '' }]);
     }
   };
 
   const handleShareClick = () => {
-      // If Weekly and Cash Balance is negative, show Request Modal
-      if (activeTab === 'WEEKLY' && weeklyStats.cashBalance < 0) {
-          // Preset beneficiary if only 1 user with number exists
+      if (activeTab === 'WEEKLY') {
+          // Defaults for the request
+          setSelectedFinanceRep("Pastor Duncan Siisi");
+          
           const usersWithNumbers = users.filter(u => u.momoNumber);
-          if (usersWithNumbers.length === 1) {
+          if (usersWithNumbers.length >= 1) {
               setSelectedBeneficiary(usersWithNumbers[0].name);
               setBeneficiaryNumber(usersWithNumbers[0].momoNumber || '');
           }
-          // Preset Finance Rep if available
-          if (financeRep) {
-              setSelectedFinanceRep(financeRep.name);
-          }
+          
           setIsRequestModalOpen(true);
       } else {
           generateAndOpenWhatsApp();
@@ -346,83 +292,37 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
     if (activeTab === 'WEEKLY') {
       text += `*Period:* ${weeklyStats.range}\n\n`;
-      
-      text += `*OFFERINGS*\n`;
-      text += `Cash: ${formatCurrency(weeklyStats.offerings.cash)}\n`;
-      text += `MoMo: ${formatCurrency(weeklyStats.offerings.momo)}\n\n`;
+      text += `*OFFERINGS*\nCash: ${formatCurrency(weeklyStats.offerings.cash)}\nMoMo: ${formatCurrency(weeklyStats.offerings.momo)}\n\n*Total Offerings: ${formatCurrency(weeklyStats.totalIncome)}*\n\n`;
       
       text += `*EXPENSES*\n`;
-      // Gather expenses for the week to list individually
       const { start, end } = getWeekRange(selectedWeekDate);
-      const weeklyExpenses = transactions.filter(t => {
-        const d = new Date(t.date);
-        return !t.isArchived && d >= start && d <= end && t.type === TransactionType.EXPENSE;
-      });
+      const weeklyExpenses = transactions.filter(t => !t.isArchived && t.type === TransactionType.EXPENSE && new Date(t.date) >= start && new Date(t.date) <= end);
 
       if (weeklyExpenses.length > 0) {
           weeklyExpenses.forEach(t => {
-              // Check for detailed breakdown in metadata first
               if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
-                  t.meta.breakdown.forEach((item: {item: string, amount: number}) => {
-                      text += `- ${item.item}: ${formatCurrency(item.amount)}\n`;
-                  });
+                  t.meta.breakdown.forEach((item: {item: string, amount: number}) => text += `- ${item.item}: ${formatCurrency(item.amount)}\n\n`);
               } else {
-                  // Fallback for transactions without detailed breakdown
-                  const desc = t.notes ? t.notes : t.category;
-                  text += `- ${desc}: ${formatCurrency(t.amount)}\n`;
+                  text += `- ${t.notes || t.category}: ${formatCurrency(t.amount)}\n`;
               }
           });
-      } else {
-          text += `No expenses recorded.\n`;
-      }
+      } else { text += `No expenses recorded.\n`; }
       
-      text += `\n*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
+      text += `*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
       
-      text += `*SUMMARY*\n`;
-      text += `Cash Balance: ${formatCurrency(weeklyStats.cashBalance)}\n\n`;
-      
-      if (weeklyStats.cashBalance < 0 && selectedFinanceRep) {
-           text += `Dear ${selectedFinanceRep}, \n`;
-           text += `Could you kindly send *${formatCurrency(Math.abs(weeklyStats.cashBalance))}* to ${beneficiaryNumber} (${selectedBeneficiary})`;
-           text += `for the purchase of the above for CM?\n\n`;
-           text += `Thank you very much. God bless you.\n\n`;
-      } else if (weeklyStats.cashBalance > 0) {
-           //text += `*Action Required:*\n`;
-           text += `The remaining cash balance of ${formatCurrency(weeklyStats.cashBalance)} will be transferred to Finance.\n`;
-      } else {
-           text += `Net Position: ${formatCurrency(weeklyStats.totalIncome - weeklyStats.totalExpense)}\n`;
-      }
+      // Request Section - Always based on Total Expenses now
+      text += `\n*PAYMENT REQUEST*\n`;
+      text += `Hello ${selectedFinanceRep},\n`;
+      text += `Could you kindly send *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the following for CM?
+.\n`;
 
     } else {
       text += `*Period:* ${selectedYear} ${activeTab === 'MONTHLY' ? getMonthName(selectedMonth) : ''}\n\n`;
-      text += `Total Income: ${formatCurrency(analyticalData.totalIncome)}\n`;
-      text += `Total Expense: ${formatCurrency(analyticalData.totalExpense)}\n`;
-      text += `*Net Position: ${formatCurrency(analyticalData.net)}*\n\n`;
-      
-      if (analyticalData.topIncome.length > 0) {
-        text += `*Top Income:*\n`;
-        analyticalData.topIncome.forEach(i => text += `- ${i.name}: ${formatCurrency(i.value)}\n`);
-        text += `\n`;
-      }
-      if (analyticalData.topExpense.length > 0) {
-        text += `*Top Expenses:*\n`;
-        analyticalData.topExpense.forEach(i => text += `- ${i.name}: ${formatCurrency(i.value)}\n`);
-      }
+      text += `Income: ${formatCurrency(analyticalData.totalIncome)}\nExpense: ${formatCurrency(analyticalData.totalExpense)}\n*Net: ${formatCurrency(analyticalData.net)}*\n`;
     }
 
-    const encodedText = encodeURIComponent(text);
-    window.open(`https://wa.me/?text=${encodedText}`, '_blank');
-    setIsRequestModalOpen(false); // Close modal if open
-  };
-
-  const handleBeneficiarySelect = (name: string) => {
-      setSelectedBeneficiary(name);
-      const user = users.find(u => u.name === name);
-      if (user && user.momoNumber) {
-          setBeneficiaryNumber(user.momoNumber);
-      } else {
-          setBeneficiaryNumber('');
-      }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    setIsRequestModalOpen(false); 
   };
 
   return (
@@ -431,17 +331,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
         {/* Tab Navigation */}
         <div className="flex flex-wrap border-b border-gray-100 bg-gray-50/50">
           {(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'] as ReportType[]).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 min-w-[25%] py-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${
-                activeTab === tab ? 'text-primary' : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 min-w-[25%] py-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${activeTab === tab ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
               {tab}
-              {activeTab === tab && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-t-full mx-4 sm:mx-8 animate-in slide-in-from-bottom-2 duration-300" />
-              )}
+              {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-t-full mx-4 sm:mx-8 animate-in slide-in-from-bottom-2 duration-300" />}
             </button>
           ))}
         </div>
@@ -489,10 +381,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                   value={selectedWeekDate} onChange={(e) => setSelectedWeekDate(e.target.value)} />
               )}
               
-              <button 
-                onClick={handleShareClick}
-                className="flex items-center justify-center px-6 py-4 bg-[#25D366] text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-[#128C7E] transition-all shadow-xl whitespace-nowrap active:scale-95"
-              >
+              <button onClick={handleShareClick} className="flex items-center justify-center px-6 py-4 bg-[#25D366] text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-[#128C7E] transition-all shadow-xl whitespace-nowrap active:scale-95">
                 <MessageCircle size={18} className="mr-2" /> Share on WhatsApp
               </button>
             </div>
@@ -501,83 +390,38 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
           {/* --- WEEKLY VIEW CONTENT --- */}
           {activeTab === 'WEEKLY' && (
             <div className="space-y-8 sm:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* Stats Grid - Adjusted to 2 columns */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="bg-emerald-50/50 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-3xl border border-emerald-100 relative overflow-hidden group">
                   <TrendingUp className="absolute -bottom-4 -right-4 text-emerald-200 opacity-20" size={120} />
                   <h4 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-6">Sunday Offerings</h4>
                   <div className="space-y-3 relative z-10">
-                    <div className="flex justify-between border-b border-emerald-100 pb-2">
-                      <span className="text-xs font-bold text-emerald-600">CASH</span>
-                      <span className="font-mono font-bold text-emerald-900">{formatCurrency(weeklyStats.offerings.cash)}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-emerald-100 pb-2">
-                      <span className="text-xs font-bold text-emerald-600">MoMo</span>
-                      <span className="font-mono font-bold text-emerald-900">{formatCurrency(weeklyStats.offerings.momo)}</span>
-                    </div>
-                    <div className="pt-2 flex justify-between items-center">
-                      <span className="text-sm font-black text-emerald-900">TOTAL</span>
-                      <span className="text-2xl font-black text-emerald-950">{formatCurrency(weeklyStats.totalIncome)}</span>
-                    </div>
+                    <div className="flex justify-between border-b border-emerald-100 pb-2"><span className="text-xs font-bold text-emerald-600">CASH</span><span className="font-mono font-bold text-emerald-900">{formatCurrency(weeklyStats.offerings.cash)}</span></div>
+                    <div className="flex justify-between border-b border-emerald-100 pb-2"><span className="text-xs font-bold text-emerald-600">MoMo</span><span className="font-mono font-bold text-emerald-900">{formatCurrency(weeklyStats.offerings.momo)}</span></div>
+                    <div className="pt-2 flex justify-between items-center"><span className="text-sm font-black text-emerald-900">TOTAL INCOME</span><span className="text-2xl font-black text-emerald-950">{formatCurrency(weeklyStats.totalIncome)}</span></div>
                   </div>
                 </div>
 
                 <div className="bg-rose-50/50 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-3xl border border-rose-100 relative overflow-hidden group">
                   <TrendingDown className="absolute -bottom-4 -right-4 text-rose-200 opacity-20" size={120} />
-                  <h4 className="text-[10px] font-black text-rose-700 uppercase tracking-widest mb-6">Expenses</h4>
+                  <h4 className="text-[10px] font-black text-rose-700 uppercase tracking-widest mb-6">Expenses (MoMo)</h4>
                   <div className="space-y-3 relative z-10">
-                    <div className="flex justify-between border-b border-rose-100 pb-2">
-                      <span className="text-xs font-bold text-rose-600">CASH</span>
-                      <span className="font-mono font-bold text-rose-900">{formatCurrency(weeklyStats.snacks.cash)}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-rose-100 pb-2">
-                      <span className="text-xs font-bold text-rose-600">MoMo</span>
-                      <span className="font-mono font-bold text-rose-900">{formatCurrency(weeklyStats.snacks.momo)}</span>
-                    </div>
-                    <div className="pt-2 flex justify-between items-center">
-                      <span className="text-sm font-black text-rose-900">SPENT</span>
-                      <span className="text-2xl font-black text-rose-950">{formatCurrency(weeklyStats.totalExpense)}</span>
-                    </div>
+                    <div className="flex justify-between border-b border-rose-100 pb-2"><span className="text-xs font-bold text-rose-600">CASH</span><span className="font-mono font-bold text-rose-900">{formatCurrency(weeklyStats.snacks.cash)}</span></div>
+                    <div className="flex justify-between border-b border-rose-100 pb-2"><span className="text-xs font-bold text-rose-600">MoMo</span><span className="font-mono font-bold text-rose-900">{formatCurrency(weeklyStats.snacks.momo)}</span></div>
+                    <div className="pt-2 flex justify-between items-center"><span className="text-sm font-black text-rose-900">TOTAL SPENT</span><span className="text-2xl font-black text-rose-950">{formatCurrency(weeklyStats.totalExpense)}</span></div>
                   </div>
-                </div>
-
-                {/* Modified Summary Card for Cash Balance */}
-                <div className="bg-gray-900 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-3xl flex flex-col justify-between md:col-span-2 lg:col-span-1 shadow-2xl">
-                    <div>
-                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Position</h4>
-                        <p className={`text-4xl font-black tracking-tighter my-4 ${weeklyStats.cashBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {formatCurrency(weeklyStats.cashBalance)}
-                        </p>
-                        <div className="bg-white/10 p-3 rounded-2xl text-[10px] text-gray-300 font-bold text-center uppercase tracking-widest flex items-center justify-center gap-2">
-                            {weeklyStats.cashBalance < 0 && <AlertTriangle size={12} className="text-rose-400" />}
-                            {weeklyStats.cashBalance < 0 ? 'Top-up Required' : 'Cash Surplus'}
-                        </div>
-                    </div>
-                    
-                    {/* Reconcile Button */}
-                     <button 
-                        onClick={handleReconcileCash}
-                        className="mt-4 w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-white/5"
-                    >
-                        <RefreshCw size={14} /> Reconcile Position
-                    </button>
                 </div>
               </div>
 
-              {/* Weekly Input Section - Optimized for Mobile */}
+              {/* Weekly Input Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-                {/* Income Inputs */}
                 <div className="bg-white border-2 border-emerald-50 rounded-[2rem] shadow-sm p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600"><Plus size={20}/></div>
-                    <h3 className="font-black text-emerald-900 uppercase tracking-widest text-xs">Offerings</h3>
-                  </div>
+                  <div className="flex items-center gap-3 mb-6"><div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600"><Plus size={20}/></div><h3 className="font-black text-emerald-900 uppercase tracking-widest text-xs">Offerings</h3></div>
                   <div className="space-y-4">
                     {offeringsInput.map((entry, idx) => (
                       <div key={idx} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex gap-3 items-center">
-                        <select className="p-2 bg-white rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-emerald-500/10 w-20" value={entry.type} onChange={(e) => { const n = [...offeringsInput]; n[idx].type = e.target.value as any; setOfferingsInput(n); }}>
-                          <option value="CASH">CASH</option>
-                          <option value="MOMO">MOMO</option>
+                        <select className="p-2 bg-white rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest outline-none w-20" value={entry.type} onChange={(e) => { const n = [...offeringsInput]; n[idx].type = e.target.value as any; setOfferingsInput(n); }}>
+                          <option value="CASH">CASH</option><option value="MOMO">MOMO</option>
                         </select>
                         <input type="number" placeholder="0.00" className="flex-1 p-2 bg-transparent text-sm font-bold outline-none" value={entry.amount} onChange={(e) => { const n = [...offeringsInput]; n[idx].amount = e.target.value; setOfferingsInput(n); }} />
                         {offeringsInput.length > 1 && <button onClick={() => handleRemoveOfferingInput(idx)} className="p-2 text-rose-400 hover:text-rose-600"><Trash2 size={16} /></button>}
@@ -587,22 +431,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                   </div>
                 </div>
 
-                {/* Planning Inputs */}
                 <div className="bg-white border-2 border-primary/5 rounded-[2rem] shadow-sm p-6 relative">
                   <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-primary/5 rounded-xl text-primary"><PieChart size={20}/></div>
-                        <h3 className="font-black text-primary uppercase tracking-widest text-xs">Expenses</h3>
-                      </div>
-                      
-                      {/* AI AUTO PLAN BUTTON */}
-                      <button 
-                        onClick={handleAutoPlan} 
-                        disabled={isAutoPlanning}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-violet-200 transition-colors disabled:opacity-50"
-                      >
-                         {isAutoPlanning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                         {isAutoPlanning ? 'Thinking...' : 'Smart Plan'}
+                      <div className="flex items-center gap-3"><div className="p-2.5 bg-primary/5 rounded-xl text-primary"><PieChart size={20}/></div><h3 className="font-black text-primary uppercase tracking-widest text-xs">Expenses</h3></div>
+                      <button onClick={handleAutoPlan} disabled={isAutoPlanning} className="flex items-center gap-2 px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-violet-200 transition-colors disabled:opacity-50">
+                         {isAutoPlanning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}{isAutoPlanning ? 'Thinking...' : 'Smart Plan'}
                       </button>
                   </div>
 
@@ -610,11 +443,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                     {planInput.map((entry, idx) => (
                       <div key={idx} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex flex-col gap-2">
                         <input type="text" placeholder="Item Description" className="w-full p-2 bg-white rounded-xl border border-gray-100 text-xs font-bold outline-none" value={entry.item} onChange={(e) => { const n = [...planInput]; n[idx].item = e.target.value; setPlanInput(n); }} />
-                        <div className="flex gap-2 items-center">
-                            <span className="text-gray-400 text-xs font-bold pl-2">GHS</span>
-                             <input type="number" placeholder="0.00" className="flex-1 p-2 bg-transparent text-sm font-bold outline-none" value={entry.cost} onChange={(e) => { const n = [...planInput]; n[idx].cost = e.target.value; setPlanInput(n); }} />
-                            {planInput.length > 1 && <button onClick={() => handleRemovePlanInput(idx)} className="p-2 text-rose-400 hover:text-rose-600"><Trash2 size={16} /></button>}
-                        </div>
+                        <div className="flex gap-2 items-center"><span className="text-gray-400 text-xs font-bold pl-2">GHS</span><input type="number" placeholder="0.00" className="flex-1 p-2 bg-transparent text-sm font-bold outline-none" value={entry.cost} onChange={(e) => { const n = [...planInput]; n[idx].cost = e.target.value; setPlanInput(n); }} />
+                        {planInput.length > 1 && <button onClick={() => handleRemovePlanInput(idx)} className="p-2 text-rose-400 hover:text-rose-600"><Trash2 size={16} /></button>}</div>
                       </div>
                     ))}
                     <button onClick={handleAddPlanInput} className="w-full py-3 bg-primary/5 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 transition-colors">+ Add Item</button>
@@ -635,11 +465,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
              <div className="animate-in fade-in duration-500 space-y-8">
                 {analyticalData.isEmpty ? (
                     <div className="flex flex-col items-center justify-center py-20">
-                         <div className="p-8 bg-gray-50 rounded-[3rem] mb-6 animate-pulse">
-                            <BarChart2 size={60} className="text-gray-200" />
-                        </div>
-                        <p className="text-lg font-black text-gray-900 tracking-tighter uppercase">No Financial Data</p>
-                        <p className="text-xs text-gray-400 mt-2">There are no records for this period.</p>
+                         <div className="p-8 bg-gray-50 rounded-[3rem] mb-6 animate-pulse"><BarChart2 size={60} className="text-gray-200" /></div>
+                         <p className="text-lg font-black text-gray-900 tracking-tighter uppercase">No Financial Data</p>
                     </div>
                 ) : (
                     <>
@@ -653,7 +480,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                                 <p className="text-3xl font-black text-rose-900 mt-2 tracking-tighter">{formatCurrency(analyticalData.totalExpense)}</p>
                             </div>
                             <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-lg shadow-gray-100">
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Net Balance</p>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Net Balance (P&L)</p>
                                 <p className={`text-3xl font-black mt-2 tracking-tighter ${analyticalData.net >= 0 ? 'text-primary' : 'text-rose-500'}`}>{formatCurrency(analyticalData.net)}</p>
                             </div>
                         </div>
@@ -674,115 +501,34 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                                 </ResponsiveContainer>
                             </div>
                         </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100">
-                                 <h4 className="text-xs font-black text-emerald-700 uppercase tracking-widest mb-6 flex items-center gap-2"><Target size={16}/> Top Income Sources</h4>
-                                <div className="space-y-6">
-                                    {analyticalData.topIncome.map((item, idx) => (
-                                        <div key={idx} className="space-y-2">
-                                            <div className="flex justify-between items-center text-sm"><span className="font-bold text-gray-700">{item.name}</span><span className="font-black text-emerald-600">{formatCurrency(item.value)}</span></div>
-                                            <div className="h-2 w-full bg-emerald-50 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${(item.value / analyticalData.totalIncome) * 100}%` }}/></div>
-                                        </div>
-                                    ))}
-                                    {analyticalData.topIncome.length === 0 && <p className="text-gray-400 text-xs italic">No income data available.</p>}
-                                </div>
-                            </div>
-                            <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100">
-                                 <h4 className="text-xs font-black text-rose-700 uppercase tracking-widest mb-6 flex items-center gap-2"><Target size={16}/> Top Cost Drivers</h4>
-                                <div className="space-y-6">
-                                    {analyticalData.topExpense.map((item, idx) => (
-                                        <div key={idx} className="space-y-2">
-                                            <div className="flex justify-between items-center text-sm"><span className="font-bold text-gray-700">{item.name}</span><span className="font-black text-rose-600">{formatCurrency(item.value)}</span></div>
-                                            <div className="h-2 w-full bg-rose-50 rounded-full overflow-hidden"><div className="h-full bg-rose-500 rounded-full transition-all duration-1000" style={{ width: `${(item.value / analyticalData.totalExpense) * 100}%` }}/></div>
-                                        </div>
-                                    ))}
-                                    {analyticalData.topExpense.length === 0 && <p className="text-gray-400 text-xs italic">No expense data available.</p>}
-                                </div>
-                            </div>
-                        </div>
                     </>
                 )}
              </div>
           )}
         </div>
       </div>
-
-      {/* Cash Request Modal */}
+      {/* Request Modal */}
       {isRequestModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-950/70 backdrop-blur-sm animate-in fade-in duration-300">
               <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
-                  <div className="p-8 bg-rose-50/50 border-b border-rose-100">
-                      <div className="flex items-center gap-3 mb-2">
-                          <div className="p-2 bg-rose-100 rounded-full text-rose-600"><AlertTriangle size={20}/></div>
-                          <h3 className="text-xl font-black text-rose-900 uppercase tracking-tight">Cash Deficit Detected</h3>
-                      </div>
-                      <p className="text-rose-700 text-sm font-medium">
-                          You need <span className="font-black">{formatCurrency(Math.abs(weeklyStats.cashBalance))}</span> to cover expenses.
-                      </p>
+                  <div className="p-8 bg-blue-50/50 border-b border-blue-100">
+                      <h3 className="text-xl font-black text-blue-900 uppercase tracking-tight mb-1">Expense Reimbursement</h3>
+                      <p className="text-blue-700 text-sm font-medium">Requesting <span className="font-black">{formatCurrency(weeklyStats.totalExpense)}</span> for weekly expenses.</p>
                   </div>
                   <div className="p-8 space-y-6">
                       <div>
-                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Request From (Finance)</label>
-                          <div className="relative">
-                              <UserIcon size={16} className="absolute left-4 top-4 text-gray-400" />
-                              <input 
-                                  list="finance-reps"
-                                  className="w-full p-4 pl-12 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10"
-                                  placeholder="Select or Type Name..."
-                                  value={selectedFinanceRep}
-                                  onChange={(e) => setSelectedFinanceRep(e.target.value)}
-                              />
-                              <datalist id="finance-reps">
-                                  {users.filter(u => u.role === 'FINANCE_REP' || u.role === 'ADMIN').map(u => (
-                                      <option key={u.id} value={u.name} />
-                                  ))}
-                              </datalist>
-                          </div>
+                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Request From</label>
+                          <input list="finance-reps" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="Finance Rep..." value={selectedFinanceRep} onChange={(e) => setSelectedFinanceRep(e.target.value)} />
+                          <datalist id="finance-reps">{users.filter(u => u.role === 'FINANCE_REP' || u.role === 'ADMIN').map(u => <option key={u.id} value={u.name} />)}</datalist>
                       </div>
-
                       <div>
-                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Send MoMo To (Beneficiary)</label>
-                          <div className="space-y-3">
-                                <div className="relative">
-                                    <UserIcon size={16} className="absolute left-4 top-4 text-gray-400" />
-                                    <input 
-                                        list="beneficiaries"
-                                        className="w-full p-4 pl-12 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10"
-                                        placeholder="Select or Type Name..."
-                                        value={selectedBeneficiary}
-                                        onChange={(e) => handleBeneficiarySelect(e.target.value)}
-                                    />
-                                    <datalist id="beneficiaries">
-                                        {users.map(u => (
-                                            <option key={u.id} value={u.name} />
-                                        ))}
-                                    </datalist>
-                                </div>
-                                <input 
-                                    type="text"
-                                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10"
-                                    placeholder="MoMo Number"
-                                    value={beneficiaryNumber}
-                                    onChange={(e) => setBeneficiaryNumber(e.target.value)}
-                                />
-                          </div>
+                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Send To</label>
+                          <input list="beneficiaries" className="w-full p-4 mb-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="Beneficiary..." value={selectedBeneficiary} onChange={(e) => { setSelectedBeneficiary(e.target.value); const u = users.find(user => user.name === e.target.value); if(u) setBeneficiaryNumber(u.momoNumber || ''); }} />
+                          <datalist id="beneficiaries">{users.map(u => <option key={u.id} value={u.name} />)}</datalist>
+                          <input type="text" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="024..." value={beneficiaryNumber} onChange={(e) => setBeneficiaryNumber(e.target.value)} />
                       </div>
-
-                      <button 
-                          onClick={generateAndOpenWhatsApp}
-                          disabled={!selectedFinanceRep || !selectedBeneficiary || !beneficiaryNumber}
-                          className="w-full py-4 bg-[#25D366] text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-[#128C7E] transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                          <Send size={16} /> Generate Request
-                      </button>
-                      
-                      <button 
-                        onClick={() => setIsRequestModalOpen(false)}
-                        className="w-full py-3 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-gray-600"
-                      >
-                          Cancel
-                      </button>
+                      <button onClick={generateAndOpenWhatsApp} disabled={!selectedFinanceRep || !selectedBeneficiary} className="w-full py-4 bg-[#25D366] text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-[#128C7E] shadow-xl">Generate Request</button>
+                      <button onClick={() => setIsRequestModalOpen(false)} className="w-full py-3 text-gray-400 text-[10px] font-black uppercase tracking-widest">Cancel</button>
                   </div>
               </div>
           </div>

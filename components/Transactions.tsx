@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Transaction, TransactionType, AccountType, Category } from '../types';
 import { formatCurrency } from '../utils';
-import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check } from 'lucide-react';
+import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check, ArrowRightLeft } from 'lucide-react';
 
 interface TransactionsProps {
   transactions: Transaction[];
@@ -48,7 +48,17 @@ const HistoryList = React.memo(({
                                 t.type === TransactionType.INCOME ? 'bg-emerald-100 text-emerald-800' :
                                 t.type === TransactionType.EXPENSE ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'
                             }`}>{t.type === TransactionType.TRANSFER ? 'TRANS' : t.type}</span>
-                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[80px]">{t.accountId}</span>
+                            
+                            {/* Account Display: Shows Flow if Transfer */}
+                            {t.type === TransactionType.TRANSFER ? (
+                                <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">
+                                    <span>{t.accountId}</span>
+                                    <ArrowRight size={8} />
+                                    <span>{t.toAccountId}</span>
+                                </div>
+                            ) : (
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[80px]">{t.accountId}</span>
+                            )}
                         </div>
                         <h4 className={`font-bold leading-tight truncate text-sm md:text-base ${t.isArchived ? 'text-gray-500' : 'text-gray-800'}`}>{t.category}</h4>
                         {t.notes && <p className="text-[10px] md:text-xs text-gray-500 mt-0.5 font-medium line-clamp-1">{t.notes}</p>}
@@ -56,7 +66,8 @@ const HistoryList = React.memo(({
                     <div className="text-right whitespace-nowrap">
                         <p className={`text-lg md:text-xl font-black tracking-tighter ${
                             t.isArchived ? 'text-gray-500' :
-                            t.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-rose-600'
+                            t.type === TransactionType.INCOME ? 'text-emerald-600' : 
+                            t.type === TransactionType.EXPENSE ? 'text-rose-600' : 'text-blue-600'
                         }`}>
                             {t.type === TransactionType.EXPENSE ? '-' : ''}{formatCurrency(t.amount)}
                         </p>
@@ -157,42 +168,68 @@ const EntryForm = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                   <div>
-                        <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">
-                            {activeTab === 'TRANSFER' ? 'Source Account' : 'Account Type'}
-                        </label>
-                        <select 
-                            value={entry.accountId}
-                            onChange={(e) => updateEntry(index, 'accountId', e.target.value)}
-                            className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
-                        >
-                            <option value="">Select Account...</option>
-                            {accounts.map((a: string) => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                   </div>
                    {activeTab === 'TRANSFER' ? (
-                       <div>
-                            <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Destination</label>
-                            <select 
-                                value={entry.toAccountId}
-                                onChange={(e) => updateEntry(index, 'toAccountId', e.target.value)}
-                                className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
-                            >
-                                <option value="">To Account...</option>
-                                {accounts.map((a: string) => <option key={a} value={a}>{a}</option>)}
-                            </select>
+                       <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                           <div>
+                                <label className="block text-[10px] font-black text-blue-400 mb-2 uppercase tracking-widest">From (Source)</label>
+                                <select 
+                                    value={entry.accountId}
+                                    onChange={(e) => updateEntry(index, 'accountId', e.target.value)}
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
+                                >
+                                    <option value="">Select Account...</option>
+                                    {accounts.map((a: string) => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                           </div>
+                           <div className="relative">
+                                <div className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-1 border border-blue-100 text-blue-400 shadow-sm">
+                                    <ArrowRight size={16} />
+                                </div>
+                                <label className="block text-[10px] font-black text-blue-400 mb-2 uppercase tracking-widest">To (Destination)</label>
+                                <select 
+                                    value={entry.toAccountId}
+                                    onChange={(e) => updateEntry(index, 'toAccountId', e.target.value)}
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
+                                >
+                                    <option value="">Select Account...</option>
+                                    {accounts.map((a: string) => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                           </div>
+                           <div className="md:col-span-2">
+                               <label className="block text-[10px] font-black text-blue-400 mb-2 uppercase tracking-widest">Transfer Notes</label>
+                               <input
+                                    type="text"
+                                    placeholder="Reason for transfer..."
+                                    value={entry.notes}
+                                    onChange={(e) => updateEntry(index, 'notes', e.target.value)}
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-3.5 border text-sm font-bold outline-none bg-white"
+                                />
+                           </div>
                        </div>
                    ) : (
-                       <div>
-                           <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Notes / Description</label>
-                           <textarea
-                                placeholder="Enter description or recipient details..."
-                                value={entry.notes}
-                                onChange={(e) => updateEntry(index, 'notes', e.target.value)}
-                                className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none transition-shadow duration-200"
-                                rows={1}
-                            />
-                       </div>
+                       <>
+                           <div>
+                                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Account Type</label>
+                                <select 
+                                    value={entry.accountId}
+                                    onChange={(e) => updateEntry(index, 'accountId', e.target.value)}
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
+                                >
+                                    <option value="">Select Account...</option>
+                                    {accounts.map((a: string) => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                           </div>
+                           <div>
+                               <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Notes / Description</label>
+                               <textarea
+                                    placeholder="Enter description or recipient details..."
+                                    value={entry.notes}
+                                    onChange={(e) => updateEntry(index, 'notes', e.target.value)}
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none transition-shadow duration-200"
+                                    rows={1}
+                                />
+                           </div>
+                       </>
                    )}
                 </div>
               </div>
@@ -571,13 +608,16 @@ const Transactions: React.FC<TransactionsProps> = ({
                             <div className="flex flex-col items-center justify-center py-6 md:py-8 bg-gray-50/50 rounded-[2rem] border border-gray-100 relative overflow-hidden">
                                 <span className={`text-5xl md:text-6xl font-black tracking-tighter relative z-10 ${
                                     selectedTransaction.isArchived ? 'text-gray-400' :
-                                    selectedTransaction.type === TransactionType.INCOME ? 'text-emerald-600' : 'text-rose-600'
+                                    selectedTransaction.type === TransactionType.INCOME ? 'text-emerald-600' : 
+                                    selectedTransaction.type === TransactionType.EXPENSE ? 'text-rose-600' : 'text-blue-600'
                                 }`}>
                                     {selectedTransaction.type === TransactionType.EXPENSE ? '-' : ''}
                                     {formatCurrency(selectedTransaction.amount)}
                                 </span>
                                 <span className="text-[10px] font-black text-gray-400 mt-4 uppercase tracking-[0.2em] relative z-10">
-                                    {selectedTransaction.isArchived ? 'ARCHIVED VALUATION' : `${selectedTransaction.type} SETTLEMENT`}
+                                    {selectedTransaction.isArchived ? 'ARCHIVED VALUATION' : 
+                                     selectedTransaction.type === TransactionType.TRANSFER ? 'FUND TRANSFER' :
+                                     `${selectedTransaction.type} SETTLEMENT`}
                                 </span>
                             </div>
 
@@ -592,7 +632,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                                 <div className="flex items-start gap-4 p-4 rounded-2xl bg-gray-50/30 border border-gray-50">
                                     <div className="p-3 bg-white rounded-xl text-primary shadow-sm"><CreditCard size={20}/></div>
                                     <div>
-                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Payment Method</p>
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Source Account</p>
                                         <p className="font-bold text-gray-900">{selectedTransaction.accountId}</p>
                                     </div>
                                 </div>
@@ -610,7 +650,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                                     <div className="flex items-start gap-4 p-4 rounded-2xl bg-gray-50/30 border border-gray-50">
                                         <div className="p-3 bg-white rounded-xl text-primary shadow-sm"><ArrowRight size={20}/></div>
                                         <div>
-                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Transfer Destination</p>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Destination</p>
                                             <p className="font-bold text-gray-900">{selectedTransaction.toAccountId}</p>
                                         </div>
                                     </div>

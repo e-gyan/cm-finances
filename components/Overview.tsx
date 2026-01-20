@@ -24,6 +24,7 @@ const Overview: React.FC<OverviewProps> = ({ transactions, onFilterAccount, sele
     return transactions.filter(t => !t.isArchived && new Date(t.date).getFullYear() === selectedYear);
   }, [transactions, selectedYear]);
 
+  // Account Balances include Transfers
   const calculateBalance = (account?: AccountType) => {
     return filteredTransactions.reduce((acc, t) => {
       if (t.type === TransactionType.TRANSFER) {
@@ -39,6 +40,7 @@ const Overview: React.FC<OverviewProps> = ({ transactions, onFilterAccount, sele
     }, 0);
   };
 
+  // Global Totals EXCLUDE Transfers (P&L View)
   const totals = useMemo(() => {
     const income = filteredTransactions
       .filter(t => t.type === TransactionType.INCOME)
@@ -51,7 +53,8 @@ const Overview: React.FC<OverviewProps> = ({ transactions, onFilterAccount, sele
 
   const chartData = useMemo(() => {
     const data: Record<string, { name: string; income: number; expense: number }> = {};
-    filteredTransactions.forEach(t => {
+    // Exclude Transfers from the Graph to show P&L Trend
+    filteredTransactions.filter(t => t.type !== TransactionType.TRANSFER).forEach(t => {
       let key = '';
       const date = new Date(t.date);
       if (graphPeriod === 'YEAR') {
