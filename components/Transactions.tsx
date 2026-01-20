@@ -18,7 +18,7 @@ type TabType = 'INCOME' | 'EXPENSE' | 'TRANSFER';
 
 // --- Sub-Components ---
 
-// 1. Memoized History List to prevent re-renders when typing in the form
+// 1. Memoized History List (Refactored for Mobile Fit)
 const HistoryList = React.memo(({ 
   displayedList, 
   onSelect, 
@@ -34,46 +34,62 @@ const HistoryList = React.memo(({
             <div 
                 key={t.id} 
                 onClick={() => onSelect(t)}
-                className={`p-4 md:px-10 md:py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 transition-all cursor-pointer hover:bg-gray-50 active:scale-[0.99] group ${t.isArchived ? 'opacity-60 bg-gray-50/50 grayscale-[0.5]' : ''}`}
+                className={`p-4 md:px-8 md:py-5 flex items-start gap-3 md:gap-6 transition-all cursor-pointer hover:bg-gray-50 active:scale-[0.99] group ${t.isArchived ? 'opacity-60 bg-gray-50/50 grayscale-[0.5]' : ''}`}
             >
-                <div className="flex items-center gap-4 md:gap-6 flex-1 w-full">
-                    <div className={`text-center min-w-[50px] md:min-w-[60px] p-2 rounded-2xl ${t.isArchived ? 'bg-gray-200' : 'bg-gray-50'}`}>
-                        <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">{new Date(t.date).toLocaleString('default', { month: 'short' })}</p>
-                        <p className="text-lg md:text-xl font-black text-gray-900 leading-none mt-1">{new Date(t.date).getDate()}</p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
-                                t.isArchived ? 'bg-gray-400 text-white' :
-                                t.type === TransactionType.INCOME ? 'bg-emerald-100 text-emerald-800' :
-                                t.type === TransactionType.EXPENSE ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'
-                            }`}>{t.type === TransactionType.TRANSFER ? 'TRANS' : t.type}</span>
-                            
-                            {/* Account Display: Shows Flow if Transfer */}
-                            {t.type === TransactionType.TRANSFER ? (
-                                <div className="flex items-center gap-1 text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">
-                                    <span>{t.accountId}</span>
-                                    <ArrowRight size={8} />
-                                    <span>{t.toAccountId}</span>
-                                </div>
-                            ) : (
-                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[80px]">{t.accountId}</span>
-                            )}
-                        </div>
-                        <h4 className={`font-bold leading-tight truncate text-sm md:text-base ${t.isArchived ? 'text-gray-500' : 'text-gray-800'}`}>{t.category}</h4>
-                        {t.notes && <p className="text-[10px] md:text-xs text-gray-500 mt-0.5 font-medium line-clamp-1">{t.notes}</p>}
-                    </div>
-                    <div className="text-right whitespace-nowrap">
-                        <p className={`text-lg md:text-xl font-black tracking-tighter ${
-                            t.isArchived ? 'text-gray-500' :
+                {/* Date Box - Compact */}
+                <div className={`shrink-0 flex flex-col items-center justify-center w-12 h-12 md:w-14 md:h-14 rounded-2xl border border-gray-100 ${t.isArchived ? 'bg-gray-200' : 'bg-white shadow-sm'}`}>
+                    <span className="text-[9px] font-black text-gray-400 uppercase leading-none">{new Date(t.date).toLocaleString('default', { month: 'short' }).toUpperCase()}</span>
+                    <span className="text-lg md:text-xl font-black text-gray-900 leading-none mt-0.5">{new Date(t.date).getDate()}</span>
+                </div>
+
+                {/* Content Area - Stacked for Mobile, Row for Desktop */}
+                <div className="flex-1 min-w-0 py-0.5">
+                    {/* Top Row: Title & Amount */}
+                    <div className="flex justify-between items-start mb-1">
+                        <h4 className={`font-bold text-sm md:text-base truncate pr-2 ${t.isArchived ? 'text-gray-500' : 'text-gray-900'}`}>
+                            {t.category}
+                        </h4>
+                        <span className={`text-sm md:text-lg font-black tracking-tight whitespace-nowrap ${
+                            t.isArchived ? 'text-gray-400' :
                             t.type === TransactionType.INCOME ? 'text-emerald-600' : 
                             t.type === TransactionType.EXPENSE ? 'text-rose-600' : 'text-blue-600'
                         }`}>
                             {t.type === TransactionType.EXPENSE ? '-' : ''}{formatCurrency(t.amount)}
-                        </p>
+                        </span>
                     </div>
-                    <ChevronRight className={`hidden md:block transition-all group-hover:translate-x-1 ${t.isArchived ? 'text-gray-300' : 'text-gray-300 group-hover:text-primary'}`} size={20} />
+
+                    {/* Bottom Row: Metadata Tags */}
+                    <div className="flex flex-wrap items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
+                        {/* Type Badge */}
+                        <span className={`px-1.5 py-0.5 rounded-md font-black uppercase tracking-wider ${
+                             t.type === TransactionType.INCOME ? 'bg-emerald-50 text-emerald-700' :
+                             t.type === TransactionType.EXPENSE ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'
+                        }`}>
+                            {t.type === TransactionType.TRANSFER ? 'TRANS' : t.type}
+                        </span>
+
+                        {/* Account Badge */}
+                        <span className="px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 font-bold uppercase tracking-wider truncate max-w-[100px]">
+                            {t.type === TransactionType.TRANSFER ? `${t.accountId} → ${t.toAccountId}` : t.accountId}
+                        </span>
+
+                        {/* Notes (Truncated) */}
+                        {t.notes && (
+                            <span className="hidden sm:inline text-gray-400 font-medium truncate max-w-[150px] md:max-w-xs border-l border-gray-200 pl-2">
+                                {t.notes}
+                            </span>
+                        )}
+                    </div>
+                    {/* Mobile Only Notes Line */}
+                    {t.notes && (
+                        <p className="sm:hidden text-[10px] text-gray-400 mt-1 truncate font-medium">
+                            {t.notes}
+                        </p>
+                    )}
                 </div>
+
+                {/* Desktop Arrow */}
+                <ChevronRight className="hidden md:block text-gray-300 group-hover:text-primary transition-colors self-center" size={18} />
             </div>
         ))}
         {displayedList.length === 0 && (
@@ -124,7 +140,7 @@ const EntryForm = ({
         <div className="p-4 md:p-10 max-h-[75vh] md:max-h-none overflow-y-auto">
           <div className="space-y-6">
             {entries.map((entry: any, index: number) => (
-              <div key={index} className="relative p-4 md:p-8 bg-gray-50/50 rounded-3xl border border-gray-200 space-y-4 md:space-y-6 shadow-inner group transition-all hover:bg-white hover:shadow-lg">
+              <div key={index} className="relative p-5 md:p-8 bg-gray-50/50 rounded-3xl border border-gray-200 space-y-4 md:space-y-6 shadow-inner group transition-all hover:bg-white hover:shadow-lg">
                 {entries.length > 1 && (
                     <button onClick={() => handleRemoveEntry(index)} className="absolute top-2 right-2 md:top-4 md:right-4 text-gray-300 hover:text-rose-500 z-10 p-2 bg-white rounded-2xl shadow-sm border border-gray-100">
                         <X size={16} />
@@ -433,7 +449,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                  </button>
             </div>
 
-            <div className={`flex-col md:flex-row gap-3 w-full xl:w-auto items-center ${showFilters ? 'flex' : 'hidden md:flex'}`}>
+            <div className={`flex-col md:flex-row gap-3 w-full xl:w-auto items-center animate-in slide-in-from-top-2 duration-300 ${showFilters ? 'flex' : 'hidden md:flex'}`}>
                 <div className="relative flex-1 w-full">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input 
@@ -508,7 +524,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                       <X size={24} />
                   </button>
               </div>
-              <div className="flex-1 overflow-y-auto bg-gray-50">
+              <div className="flex-1 overflow-y-auto bg-gray-50 pb-safe">
                    <EntryForm 
                         activeTab={activeTab}
                         setActiveTab={setActiveTab}

@@ -494,7 +494,7 @@ const Settings: React.FC<SettingsProps> = ({
                                          <button onClick={() => onRestoreTransaction(t.id)} className="p-2 bg-white border border-gray-200 text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors" title="Restore">
                                              <RefreshCw size={16} />
                                          </button>
-                                         <button onClick={() => { if(confirm('Permanently delete this record?')) onPermanentlyDelete(t.id) }} className="p-2 bg-white border border-gray-200 text-rose-600 rounded-xl hover:bg-rose-50 transition-colors" title="Delete Forever">
+                                         <button onClick={() => { if(confirm('WARNING: This will permanently remove this record from the database and your cloud backup. This action cannot be undone. Proceed with permanent deletion?')) onPermanentlyDelete(t.id) }} className="p-2 bg-white border border-gray-200 text-rose-600 rounded-xl hover:bg-rose-50 transition-colors" title="Delete Forever">
                                              <Trash2 size={16} />
                                          </button>
                                      </div>

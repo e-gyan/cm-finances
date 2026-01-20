@@ -271,7 +271,11 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const handleShareClick = () => {
       if (activeTab === 'WEEKLY') {
           // Defaults for the request
-          setSelectedFinanceRep("Pastor Duncan Siisi");
+          // Find the active Finance Rep or Admin from the Users list
+          const defaultRep = users.find(u => u.role === 'FINANCE_REP' && u.status === 'ACTIVE') || 
+                             users.find(u => u.role === 'ADMIN' && u.status === 'ACTIVE');
+          
+          setSelectedFinanceRep(defaultRep ? defaultRep.name : "");
           
           const usersWithNumbers = users.filter(u => u.momoNumber);
           if (usersWithNumbers.length >= 1) {
