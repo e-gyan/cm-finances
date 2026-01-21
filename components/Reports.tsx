@@ -36,6 +36,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const [offeringsInput, setOfferingsInput] = useState<{type: 'CASH' | 'MOMO', amount: string}[]>([
     { type: 'CASH', amount: '' }
   ]);
+  
+  // Expenses State: Global Source + List of Items
+  const [expenseSource, setExpenseSource] = useState<'MOMO' | 'CASH'>('MOMO');
   const [planInput, setPlanInput] = useState<{item: string, cost: string}[]>([
     { item: '', cost: '' }
   ]);
@@ -182,6 +185,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   // --- Handlers ---
   const handleAddOfferingInput = () => setOfferingsInput([...offeringsInput, { type: 'CASH', amount: '' }]);
   const handleRemoveOfferingInput = (idx: number) => setOfferingsInput(offeringsInput.filter((_, i) => i !== idx));
+  
   const handleAddPlanInput = () => setPlanInput([...planInput, { item: '', cost: '' }]);
   const handleRemovePlanInput = (idx: number) => setPlanInput(planInput.filter((_, i) => i !== idx));
 
@@ -200,19 +204,20 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
              contents: `Based on these recent expense records, suggest 3-4 likely items for this week's plan. Return JSON array. History: ${historyContext}`,
              config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { item: { type: Type.STRING }, cost: { type: Type.STRING } } } } }
           });
-          setPlanInput(JSON.parse(response.text));
+          
+          const raw = JSON.parse(response.text);
+          setPlanInput(raw);
       } catch (e) { console.error(e); alert("AI Auto-Plan failed."); } 
       finally { setIsAutoPlanning(false); }
   };
 
   const handleReconcileCash = () => {
-    // Legacy function - kept empty or repurposed if needed, 
-    // but primary logic is now auto-handled in saveWeeklyData.
     alert("Reconciliation is now automated when you commit the weekly report.");
   };
 
   const saveWeeklyData = () => {
-    const today = new Date().toISOString().split('T')[0];
+    // Use the user-selected date, not "today"
+    const entryDate = selectedWeekDate;
     const batchToAdd: Omit<Transaction, 'id'>[] = [];
     
     // 1. Process Offerings
@@ -220,7 +225,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       if (entry.amount && Number(entry.amount) > 0) {
         // Record Income
         batchToAdd.push({
-          date: today,
+          date: entryDate,
           type: TransactionType.INCOME,
           category: 'Offerings & Tithes',
           amount: Number(entry.amount),
@@ -228,35 +233,43 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
           isArchived: false
         });
 
-        // 2. Auto-Sweep Logic: If Cash, Transfer to MoMo immediately
+        // 2. Auto-Sweep Logic: If Cash, Transfer to MoMo immediately with specific note
         if (entry.type === 'CASH') {
             batchToAdd.push({
-                date: today,
+                date: entryDate,
                 type: TransactionType.TRANSFER,
                 category: 'Finance Transfer',
                 amount: Number(entry.amount),
                 accountId: AccountType.CASH, // Source
                 toAccountId: AccountType.MOMO, // Dest
-                notes: 'Auto-sweep: Cash Offering to MoMo',
+                notes: 'Offering cash at hand transferred',
                 isArchived: false
             });
         }
       }
     });
 
-    // 3. Process Expenses (Recorded against MOMO now)
+    // 3. Process Expenses (Recorded against Global Source as a single consolidated transaction)
     const validPlanItems = planInput.filter(p => p.item && p.cost && Number(p.cost) > 0);
     if (validPlanItems.length > 0) {
-      const totalCost = validPlanItems.reduce((acc, p) => acc + Number(p.cost), 0);
+      // Use the global expenseSource for all items in this batch
+      const accountForExpenses = expenseSource === 'CASH' ? AccountType.CASH : AccountType.MOMO;
+
+      const totalAmount = validPlanItems.reduce((sum, item) => sum + Number(item.cost), 0);
+      const itemNotes = validPlanItems.map(p => p.item).join(', ');
+
       batchToAdd.push({
-        date: today,
-        type: TransactionType.EXPENSE,
-        category: 'Snacks & Meals',
-        amount: totalCost,
-        accountId: AccountType.MOMO, // CHANGED FROM CASH TO MOMO
-        notes: `Weekly Expenses: ${validPlanItems.map(p => p.item).join(', ')}`,
-        isArchived: false,
-        meta: { isPlan: true, breakdown: validPlanItems.map(p => ({ item: p.item, amount: Number(p.cost) })) }
+          date: entryDate,
+          type: TransactionType.EXPENSE,
+          category: 'Snacks & Meals',
+          amount: totalAmount,
+          accountId: accountForExpenses,
+          notes: `Weekly Items: ${itemNotes}`,
+          isArchived: false,
+          meta: { 
+              isPlan: true, 
+              breakdown: validPlanItems.map(p => ({ item: p.item, amount: Number(p.cost) })) 
+          }
       });
     }
 
@@ -270,18 +283,10 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
   const handleShareClick = () => {
       if (activeTab === 'WEEKLY') {
-          // Defaults for the request
-          // Find the active Finance Rep or Admin from the Users list
-          const defaultRep = users.find(u => u.role === 'FINANCE_REP' && u.status === 'ACTIVE') || 
-                             users.find(u => u.role === 'ADMIN' && u.status === 'ACTIVE');
-          
-          setSelectedFinanceRep(defaultRep ? defaultRep.name : "");
-          
-          const usersWithNumbers = users.filter(u => u.momoNumber);
-          if (usersWithNumbers.length >= 1) {
-              setSelectedBeneficiary(usersWithNumbers[0].name);
-              setBeneficiaryNumber(usersWithNumbers[0].momoNumber || '');
-          }
+          // Do not prefill users - User must select
+          setSelectedFinanceRep("");
+          setSelectedBeneficiary("");
+          setBeneficiaryNumber("");
           
           setIsRequestModalOpen(true);
       } else {
@@ -305,14 +310,14 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       if (weeklyExpenses.length > 0) {
           weeklyExpenses.forEach(t => {
               if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
-                  t.meta.breakdown.forEach((item: {item: string, amount: number}) => text += `- ${item.item}: ${formatCurrency(item.amount)}\n\n`);
+                  t.meta.breakdown.forEach((item: {item: string, amount: number}) => text += `- ${item.item}: ${formatCurrency(item.amount)} (${t.accountId})\n`);
               } else {
-                  text += `- ${t.notes || t.category}: ${formatCurrency(t.amount)}\n`;
+                  text += `- ${t.notes || t.category}: ${formatCurrency(t.amount)} (${t.accountId})\n`;
               }
           });
       } else { text += `No expenses recorded.\n`; }
       
-      text += `*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
+      text += `\n*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
       
       // Request Section - Always based on Total Expenses now
       text += `\n*PAYMENT REQUEST*\n`;
@@ -408,7 +413,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
                 <div className="bg-rose-50/50 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-3xl border border-rose-100 relative overflow-hidden group">
                   <TrendingDown className="absolute -bottom-4 -right-4 text-rose-200 opacity-20" size={120} />
-                  <h4 className="text-[10px] font-black text-rose-700 uppercase tracking-widest mb-6">Expenses (MoMo)</h4>
+                  <h4 className="text-[10px] font-black text-rose-700 uppercase tracking-widest mb-6">Weekly Expenses</h4>
                   <div className="space-y-3 relative z-10">
                     <div className="flex justify-between border-b border-rose-100 pb-2"><span className="text-xs font-bold text-rose-600">CASH</span><span className="font-mono font-bold text-rose-900">{formatCurrency(weeklyStats.snacks.cash)}</span></div>
                     <div className="flex justify-between border-b border-rose-100 pb-2"><span className="text-xs font-bold text-rose-600">MoMo</span><span className="font-mono font-bold text-rose-900">{formatCurrency(weeklyStats.snacks.momo)}</span></div>
@@ -419,25 +424,49 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
               {/* Weekly Input Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+                {/* Offerings Input Card */}
                 <div className="bg-white border-2 border-emerald-50 rounded-[2rem] shadow-sm p-6">
                   <div className="flex items-center gap-3 mb-6"><div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600"><Plus size={20}/></div><h3 className="font-black text-emerald-900 uppercase tracking-widest text-xs">Offerings</h3></div>
                   <div className="space-y-4">
                     {offeringsInput.map((entry, idx) => (
                       <div key={idx} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex gap-3 items-center">
-                        <select className="p-2 bg-white rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest outline-none w-20" value={entry.type} onChange={(e) => { const n = [...offeringsInput]; n[idx].type = e.target.value as any; setOfferingsInput(n); }}>
+                        <select className="p-2 bg-white rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest outline-none w-20 shrink-0" value={entry.type} onChange={(e) => { const n = [...offeringsInput]; n[idx].type = e.target.value as any; setOfferingsInput(n); }}>
                           <option value="CASH">CASH</option><option value="MOMO">MOMO</option>
                         </select>
-                        <input type="number" placeholder="0.00" className="flex-1 p-2 bg-transparent text-sm font-bold outline-none" value={entry.amount} onChange={(e) => { const n = [...offeringsInput]; n[idx].amount = e.target.value; setOfferingsInput(n); }} />
-                        {offeringsInput.length > 1 && <button onClick={() => handleRemoveOfferingInput(idx)} className="p-2 text-rose-400 hover:text-rose-600"><Trash2 size={16} /></button>}
+                        <input type="number" placeholder="0.00" className="flex-1 min-w-0 p-2 bg-transparent text-sm font-bold outline-none" value={entry.amount} onChange={(e) => { const n = [...offeringsInput]; n[idx].amount = e.target.value; setOfferingsInput(n); }} />
+                        
+                        {/* Always show delete button if more than 1 item, formatted for mobile */}
+                        {offeringsInput.length > 1 && (
+                            <button onClick={() => handleRemoveOfferingInput(idx)} className="p-2.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 shrink-0 active:scale-95 transition-transform">
+                                <Trash2 size={16} />
+                            </button>
+                        )}
                       </div>
                     ))}
                     <button onClick={handleAddOfferingInput} className="w-full py-3 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-colors">+ Add Source</button>
                   </div>
                 </div>
 
+                {/* Expenses Input Card */}
                 <div className="bg-white border-2 border-primary/5 rounded-[2rem] shadow-sm p-6 relative">
                   <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3"><div className="p-2.5 bg-primary/5 rounded-xl text-primary"><PieChart size={20}/></div><h3 className="font-black text-primary uppercase tracking-widest text-xs">Expenses</h3></div>
+                      <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-primary/5 rounded-xl text-primary"><PieChart size={20}/></div>
+                          <div>
+                             <h3 className="font-black text-primary uppercase tracking-widest text-xs">Expenses</h3>
+                             <div className="flex items-center gap-1 mt-1">
+                                <span className="text-[9px] font-bold text-gray-400">VIA</span>
+                                <select 
+                                    value={expenseSource}
+                                    onChange={(e) => setExpenseSource(e.target.value as 'MOMO' | 'CASH')}
+                                    className="text-[9px] font-black uppercase tracking-widest bg-gray-100 rounded-lg px-2 py-1 outline-none cursor-pointer border-none text-gray-700 hover:bg-gray-200"
+                                >
+                                    <option value="MOMO">MOMO</option>
+                                    <option value="CASH">CASH</option>
+                                </select>
+                             </div>
+                          </div>
+                      </div>
                       <button onClick={handleAutoPlan} disabled={isAutoPlanning} className="flex items-center gap-2 px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-violet-200 transition-colors disabled:opacity-50">
                          {isAutoPlanning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}{isAutoPlanning ? 'Thinking...' : 'Smart Plan'}
                       </button>
@@ -445,10 +474,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
                   <div className="space-y-4">
                     {planInput.map((entry, idx) => (
-                      <div key={idx} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex flex-col gap-2">
-                        <input type="text" placeholder="Item Description" className="w-full p-2 bg-white rounded-xl border border-gray-100 text-xs font-bold outline-none" value={entry.item} onChange={(e) => { const n = [...planInput]; n[idx].item = e.target.value; setPlanInput(n); }} />
-                        <div className="flex gap-2 items-center"><span className="text-gray-400 text-xs font-bold pl-2">GHS</span><input type="number" placeholder="0.00" className="flex-1 p-2 bg-transparent text-sm font-bold outline-none" value={entry.cost} onChange={(e) => { const n = [...planInput]; n[idx].cost = e.target.value; setPlanInput(n); }} />
-                        {planInput.length > 1 && <button onClick={() => handleRemovePlanInput(idx)} className="p-2 text-rose-400 hover:text-rose-600"><Trash2 size={16} /></button>}</div>
+                      <div key={idx} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex gap-2 items-center">
+                        <input type="text" placeholder="Item Description" className="flex-1 min-w-0 p-2 bg-white rounded-xl border border-gray-100 text-xs font-bold outline-none" value={entry.item} onChange={(e) => { const n = [...planInput]; n[idx].item = e.target.value; setPlanInput(n); }} />
+                        <div className="flex gap-2 items-center shrink-0">
+                            <span className="text-gray-400 text-xs font-bold pl-1 hidden sm:inline">GHS</span>
+                            <input type="number" placeholder="0.00" className="w-20 sm:w-24 p-2 bg-transparent text-sm font-bold outline-none" value={entry.cost} onChange={(e) => { const n = [...planInput]; n[idx].cost = e.target.value; setPlanInput(n); }} />
+                        </div>
+                        {planInput.length > 1 && <button onClick={() => handleRemovePlanInput(idx)} className="p-2 text-rose-400 hover:text-rose-600 shrink-0"><Trash2 size={16} /></button>}
                       </div>
                     ))}
                     <button onClick={handleAddPlanInput} className="w-full py-3 bg-primary/5 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 transition-colors">+ Add Item</button>
@@ -521,13 +553,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                   </div>
                   <div className="p-8 space-y-6">
                       <div>
-                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Request From</label>
+                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Request To</label>
                           <input list="finance-reps" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="Finance Rep..." value={selectedFinanceRep} onChange={(e) => setSelectedFinanceRep(e.target.value)} />
                           <datalist id="finance-reps">{users.filter(u => u.role === 'FINANCE_REP' || u.role === 'ADMIN').map(u => <option key={u.id} value={u.name} />)}</datalist>
                       </div>
                       <div>
-                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Send To</label>
-                          <input list="beneficiaries" className="w-full p-4 mb-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="Beneficiary..." value={selectedBeneficiary} onChange={(e) => { setSelectedBeneficiary(e.target.value); const u = users.find(user => user.name === e.target.value); if(u) setBeneficiaryNumber(u.momoNumber || ''); }} />
+                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Beneficiary Account</label>
+                          <input list="beneficiaries" className="w-full p-4 mb-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="Beneficiary Name..." value={selectedBeneficiary} onChange={(e) => { setSelectedBeneficiary(e.target.value); const u = users.find(user => user.name === e.target.value); if(u) setBeneficiaryNumber(u.momoNumber || ''); }} />
                           <datalist id="beneficiaries">{users.map(u => <option key={u.id} value={u.name} />)}</datalist>
                           <input type="text" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="024..." value={beneficiaryNumber} onChange={(e) => setBeneficiaryNumber(e.target.value)} />
                       </div>
