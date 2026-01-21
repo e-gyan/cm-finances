@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Category, User, Transaction, AccountType, TransactionType } from '../types';
-import { Trash2, Plus, RefreshCw, Archive, Search, FileText, Edit2, Check, X, AlertTriangle, Database, Download, Upload, Cloud, Lock, Key, Shield, UserPlus, Power, Eye, EyeOff, Smartphone, BookOpen, Map, Activity, GitMerge, Share2, Layers, ShieldCheck, LayoutTemplate, Lightbulb, Users, ArrowRight, MousePointerClick, Zap } from 'lucide-react';
+import { Trash2, Plus, RefreshCw, Archive, Search, FileText, Edit2, Check, X, AlertTriangle, Database, Download, Upload, Cloud, Lock, Key, Shield, UserPlus, Power, Eye, EyeOff, Smartphone, BookOpen, Map, Activity, GitMerge, Share2, Layers, ShieldCheck, LayoutTemplate, Lightbulb, Users, ArrowRight, MousePointerClick, Zap, Square, CheckSquare } from 'lucide-react';
 import { formatCurrency } from '../utils';
 
 interface SettingsProps {
@@ -11,9 +11,9 @@ interface SettingsProps {
   onAddCategory: (c: Category) => void;
   onEditCategory: (c: Category) => void;
   onDeleteCategory: (id: string) => void;
-  onRestoreTransaction: (id: string) => void;
-  onPermanentlyDelete: (id: string) => void;
-  onUpdateTransaction: (t: Transaction) => void;
+  onRestoreTransaction: (ids: string | string[]) => void;
+  onPermanentlyDelete: (ids: string | string[]) => void;
+  onUpdateTransaction: (t: Transaction | Transaction[]) => void;
   onImportData: (data: { transactions: Transaction[], categories: Category[], users: User[] }) => void;
   cloudConfig: { binId: string; apiKey: string };
   onUpdateCloudConfig: (binId: string, apiKey: string) => void;
@@ -45,9 +45,12 @@ const Settings: React.FC<SettingsProps> = ({
   const [archiveSearch, setArchiveSearch] = useState('');
   const deferredArchiveSearch = useDeferredValue(archiveSearch); // SMOOTH TYPING
 
-  // Archive Editing
+  // Archive Selection & Editing
+  const [selectedArchiveIds, setSelectedArchiveIds] = useState<Set<string>>(new Set());
   const [isArchiveEditing, setIsArchiveEditing] = useState(false);
+  const [isBulkEditing, setIsBulkEditing] = useState(false);
   const [archiveEditForm, setArchiveEditForm] = useState<Transaction | null>(null);
+  const [bulkEditForm, setBulkEditForm] = useState<{ category: string, accountId: string, notes: string }>({ category: '', accountId: '', notes: '' });
 
   // Cloud Config State
   const [tempBinId, setTempBinId] = useState(cloudConfig.binId);
@@ -78,6 +81,11 @@ const Settings: React.FC<SettingsProps> = ({
           setTempApiKey(cloudConfig.apiKey);
       }
   }, [cloudConfig, isCloudUnlocked]);
+
+  // Clear selection when search changes or tab changes
+  useEffect(() => {
+      setSelectedArchiveIds(new Set());
+  }, [activeSection, deferredArchiveSearch]);
 
   const handleAddCategory = () => {
     if (!newCatName) return;
@@ -112,18 +120,53 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // Archive Edit Handlers
+  // Archive Selection Handlers
+  const toggleSelectArchive = (id: string) => {
+      const newSet = new Set(selectedArchiveIds);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      setSelectedArchiveIds(newSet);
+  };
+
+  const toggleSelectAll = (filteredItems: Transaction[]) => {
+      if (selectedArchiveIds.size === filteredItems.length && filteredItems.length > 0) {
+          setSelectedArchiveIds(new Set());
+      } else {
+          setSelectedArchiveIds(new Set(filteredItems.map(t => t.id)));
+      }
+  };
+
+  // Archive Edit Handlers (Single & Bulk)
   const handleEditArchive = (t: Transaction) => {
       setArchiveEditForm({...t});
+      setIsArchiveEditing(true);
+      setIsBulkEditing(false);
+  };
+
+  const handleBulkEditStart = () => {
+      setBulkEditForm({ category: '', accountId: '', notes: '' });
+      setIsBulkEditing(true);
       setIsArchiveEditing(true);
   };
 
   const handleSaveArchiveEdit = () => {
-      if(archiveEditForm) {
+      if (isBulkEditing) {
+          const updates = archivedTransactions
+              .filter(t => selectedArchiveIds.has(t.id))
+              .map(t => ({
+                  ...t,
+                  category: bulkEditForm.category || t.category,
+                  accountId: bulkEditForm.accountId ? (bulkEditForm.accountId as AccountType) : t.accountId,
+                  notes: bulkEditForm.notes ? t.notes + ' ' + bulkEditForm.notes : t.notes
+              }));
+          onUpdateTransaction(updates);
+      } else if (archiveEditForm) {
           onUpdateTransaction(archiveEditForm);
-          setIsArchiveEditing(false);
-          setArchiveEditForm(null);
       }
+      setIsArchiveEditing(false);
+      setIsBulkEditing(false);
+      setArchiveEditForm(null);
+      setSelectedArchiveIds(new Set());
   };
 
   // Security & Cloud Logic
@@ -348,7 +391,7 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
         )}
 
-        {/* ... (USERS, ARCHIVE, CLOUD sections remain unchanged, included below to maintain file structure) ... */}
+        {/* ... (USERS section included below to maintain file structure) ... */}
         {activeSection === 'USERS' && (
              <div className="space-y-8 animate-in fade-in duration-500">
                  <div className="flex justify-between items-end border-b border-gray-100 pb-4">
@@ -443,22 +486,41 @@ const Settings: React.FC<SettingsProps> = ({
         )}
 
         {activeSection === 'ARCHIVE' && (
-             <div className="space-y-8 animate-in fade-in duration-500">
-                 <div className="flex flex-col md:flex-row justify-between items-end border-b border-gray-100 pb-4 gap-4">
-                    <div>
-                        <h3 className="text-xl md:text-2xl font-black text-gray-900 tracking-tighter uppercase">Archived Records</h3>
-                        <p className="text-xs md:text-sm font-medium text-gray-400 mt-1">View, restore, or modify soft-deleted transactions.</p>
+             <div className="space-y-6 animate-in fade-in duration-500">
+                 <div className="flex flex-col gap-4">
+                    <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                         <div>
+                            <h3 className="text-xl md:text-2xl font-black text-gray-900 tracking-tighter uppercase">Archived Records</h3>
+                            <p className="text-xs md:text-sm font-medium text-gray-400 mt-1">View, restore, or modify soft-deleted transactions.</p>
+                         </div>
                     </div>
-                     <div className="relative w-full md:w-64">
-                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                         <input 
-                             type="text" 
-                             placeholder="Search archives..."
-                             value={archiveSearch}
-                             onChange={(e) => setArchiveSearch(e.target.value)}
-                             className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-primary/10"
-                         />
-                     </div>
+                    
+                    <div className="flex gap-3">
+                         <div className="relative flex-1">
+                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                             <input 
+                                 type="text" 
+                                 placeholder="Search archives..."
+                                 value={archiveSearch}
+                                 onChange={(e) => setArchiveSearch(e.target.value)}
+                                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-primary/10"
+                             />
+                         </div>
+                         {/* Bulk Action Bar - Appears when items are selected */}
+                         {selectedArchiveIds.size > 0 && (
+                             <div className="flex items-center gap-2 animate-in slide-in-from-right duration-300">
+                                 <button onClick={handleBulkEditStart} className="px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-colors whitespace-nowrap">
+                                    <Edit2 size={16} className="inline mr-2 mb-0.5" /> Edit ({selectedArchiveIds.size})
+                                 </button>
+                                 <button onClick={() => { if(confirm(`Restore ${selectedArchiveIds.size} items?`)) { onRestoreTransaction(Array.from(selectedArchiveIds)); setSelectedArchiveIds(new Set()); } }} className="px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-colors whitespace-nowrap">
+                                    <RefreshCw size={16} className="inline mr-2 mb-0.5" /> Restore ({selectedArchiveIds.size})
+                                 </button>
+                                 <button onClick={() => { if(confirm(`PERMANENTLY DELETE ${selectedArchiveIds.size} items? This cannot be undone.`)) { onPermanentlyDelete(Array.from(selectedArchiveIds)); setSelectedArchiveIds(new Set()); } }} className="px-4 py-3 bg-rose-50 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-colors whitespace-nowrap">
+                                    <Trash2 size={16} className="inline mr-2 mb-0.5" /> Delete ({selectedArchiveIds.size})
+                                 </button>
+                             </div>
+                         )}
+                    </div>
                  </div>
 
                  {filteredArchive.length === 0 ? (
@@ -468,9 +530,22 @@ const Settings: React.FC<SettingsProps> = ({
                      </div>
                  ) : (
                      <div className="space-y-4">
+                         {/* Select All Header */}
+                         <div className="flex items-center gap-4 px-4 py-2 border-b border-gray-100">
+                             <button onClick={() => toggleSelectAll(filteredArchive)} className="text-gray-400 hover:text-primary transition-colors">
+                                 {selectedArchiveIds.size === filteredArchive.length && filteredArchive.length > 0 ? <CheckSquare size={20} className="text-primary"/> : <Square size={20} />}
+                             </button>
+                             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Select All {filteredArchive.length > 0 && `(${filteredArchive.length})`}</span>
+                         </div>
+
                          {filteredArchive.map(t => (
-                             <div key={t.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
+                             <div key={t.id} className={`p-4 rounded-2xl border flex flex-col md:flex-row items-center justify-between gap-4 group transition-all cursor-pointer ${selectedArchiveIds.has(t.id) ? 'bg-primary/5 border-primary/20' : 'bg-gray-50 border-gray-100 hover:bg-white hover:shadow-md'}`}
+                                  onClick={() => toggleSelectArchive(t.id)}
+                             >
                                  <div className="flex items-center gap-4 flex-1 w-full">
+                                     <div onClick={(e) => { e.stopPropagation(); toggleSelectArchive(t.id); }} className="text-gray-300 hover:text-primary cursor-pointer">
+                                         {selectedArchiveIds.has(t.id) ? <CheckSquare size={24} className="text-primary" /> : <Square size={24} />}
+                                     </div>
                                      <div className="bg-gray-200 p-3 rounded-xl min-w-[50px] text-center">
                                          <p className="text-[10px] font-black text-gray-500 uppercase">{new Date(t.date).toLocaleString('default', {month:'short'})}</p>
                                          <p className="text-lg font-black text-gray-700 leading-none">{new Date(t.date).getDate()}</p>
@@ -487,14 +562,14 @@ const Settings: React.FC<SettingsProps> = ({
                                  
                                  <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                                      <p className="font-black text-gray-500 text-lg">{formatCurrency(t.amount)}</p>
-                                     <div className="flex gap-2">
+                                     <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                                          <button onClick={() => handleEditArchive(t)} className="p-2 bg-white border border-gray-200 text-blue-600 rounded-xl hover:bg-blue-50 transition-colors" title="Edit Record">
                                              <Edit2 size={16} />
                                          </button>
                                          <button onClick={() => onRestoreTransaction(t.id)} className="p-2 bg-white border border-gray-200 text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors" title="Restore">
                                              <RefreshCw size={16} />
                                          </button>
-                                         <button onClick={() => { if(confirm('WARNING: This will permanently remove this record from the database and your cloud backup. This action cannot be undone. Proceed with permanent deletion?')) onPermanentlyDelete(t.id) }} className="p-2 bg-white border border-gray-200 text-rose-600 rounded-xl hover:bg-rose-50 transition-colors" title="Delete Forever">
+                                         <button onClick={() => { if(confirm('WARNING: Permanently delete this record?')) onPermanentlyDelete(t.id) }} className="p-2 bg-white border border-gray-200 text-rose-600 rounded-xl hover:bg-rose-50 transition-colors" title="Delete Forever">
                                              <Trash2 size={16} />
                                          </button>
                                      </div>
@@ -506,40 +581,62 @@ const Settings: React.FC<SettingsProps> = ({
              </div>
         )}
 
-        {isArchiveEditing && archiveEditForm && (
+        {/* Universal Archive Edit Modal (Handles both Single and Bulk) */}
+        {isArchiveEditing && (archiveEditForm || isBulkEditing) && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white rounded-[2rem] p-6 md:p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Modify Archived Record</h3>
-                        <button onClick={() => setIsArchiveEditing(false)} className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-gray-900"><X size={20}/></button>
+                        <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">
+                            {isBulkEditing ? `Bulk Edit (${selectedArchiveIds.size} items)` : 'Modify Archived Record'}
+                        </h3>
+                        <button onClick={() => { setIsArchiveEditing(false); setIsBulkEditing(false); }} className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-gray-900"><X size={20}/></button>
                     </div>
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Date</label>
-                                <input type="date" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none" 
-                                    value={archiveEditForm.date} onChange={e => setArchiveEditForm({...archiveEditForm, date: e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Amount</label>
-                                <input type="number" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none" 
-                                    value={archiveEditForm.amount} onChange={e => setArchiveEditForm({...archiveEditForm, amount: parseFloat(e.target.value)})} />
-                            </div>
-                        </div>
+                        {!isBulkEditing && archiveEditForm && (
+                             <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Date</label>
+                                    <input type="date" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none" 
+                                        value={archiveEditForm.date} onChange={e => setArchiveEditForm({...archiveEditForm, date: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Amount</label>
+                                    <input type="number" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none" 
+                                        value={archiveEditForm.amount} onChange={e => setArchiveEditForm({...archiveEditForm, amount: parseFloat(e.target.value)})} />
+                                </div>
+                             </div>
+                        )}
+
                         <div>
-                            <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Category</label>
+                            <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Category {isBulkEditing && '(Optional)'}</label>
                             <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none"
-                                value={archiveEditForm.category} onChange={e => setArchiveEditForm({...archiveEditForm, category: e.target.value})}>
+                                value={isBulkEditing ? bulkEditForm.category : archiveEditForm?.category} 
+                                onChange={e => isBulkEditing ? setBulkEditForm({...bulkEditForm, category: e.target.value}) : setArchiveEditForm({...archiveEditForm!, category: e.target.value})}>
+                                {isBulkEditing && <option value="">(Keep Original)</option>}
                                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
-                        <div>
-                            <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Notes</label>
-                            <textarea className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none" rows={3}
-                                value={archiveEditForm.notes || ''} onChange={e => setArchiveEditForm({...archiveEditForm, notes: e.target.value})} />
+
+                         <div>
+                            <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Account {isBulkEditing && '(Optional)'}</label>
+                            <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none"
+                                value={isBulkEditing ? bulkEditForm.accountId : archiveEditForm?.accountId} 
+                                onChange={e => isBulkEditing ? setBulkEditForm({...bulkEditForm, accountId: e.target.value}) : setArchiveEditForm({...archiveEditForm!, accountId: e.target.value as AccountType})}>
+                                {isBulkEditing && <option value="">(Keep Original)</option>}
+                                {[AccountType.CASH, AccountType.MOMO, AccountType.OTHER].map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
                         </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Notes {isBulkEditing && '(Appends to existing)'}</label>
+                            <textarea className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none" rows={3}
+                                value={isBulkEditing ? bulkEditForm.notes : archiveEditForm?.notes || ''} 
+                                onChange={e => isBulkEditing ? setBulkEditForm({...bulkEditForm, notes: e.target.value}) : setArchiveEditForm({...archiveEditForm!, notes: e.target.value})} 
+                            />
+                        </div>
+                        
                         <button onClick={handleSaveArchiveEdit} className="w-full py-4 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 shadow-lg mt-4">
-                            Save Changes to Archive
+                            {isBulkEditing ? 'Apply Changes to Selected' : 'Save Changes'}
                         </button>
                     </div>
                 </div>

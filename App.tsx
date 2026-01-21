@@ -149,8 +149,14 @@ function App() {
     saveToCloud({ transactions: newTransactions }); // Sync
   };
 
-  const updateTransaction = (updatedT: Transaction) => {
-    const newTransactions = transactions.map(t => t.id === updatedT.id ? updatedT : t);
+  const updateTransaction = (updatedT: Transaction | Transaction[]) => {
+    let newTransactions;
+    if (Array.isArray(updatedT)) {
+        const updatesMap = new Map(updatedT.map(t => [t.id, t]));
+        newTransactions = transactions.map(t => updatesMap.has(t.id) ? updatesMap.get(t.id)! : t);
+    } else {
+        newTransactions = transactions.map(t => t.id === updatedT.id ? updatedT : t);
+    }
     setTransactions(newTransactions);
     saveToCloud({ transactions: newTransactions }); // Sync
   };
@@ -161,14 +167,16 @@ function App() {
     saveToCloud({ transactions: newTransactions }); // Sync
   };
 
-  const permanentlyDeleteTransaction = (id: string) => {
-    const newTransactions = transactions.filter(t => t.id !== id);
+  const permanentlyDeleteTransaction = (ids: string | string[]) => {
+    const idArray = Array.isArray(ids) ? ids : [ids];
+    const newTransactions = transactions.filter(t => !idArray.includes(t.id));
     setTransactions(newTransactions);
     saveToCloud({ transactions: newTransactions }); // Sync
   };
 
-  const restoreTransaction = (id: string) => {
-    const newTransactions = transactions.map(t => t.id === id ? { ...t, isArchived: false } : t);
+  const restoreTransaction = (ids: string | string[]) => {
+    const idArray = Array.isArray(ids) ? ids : [ids];
+    const newTransactions = transactions.map(t => idArray.includes(t.id) ? { ...t, isArchived: false } : t);
     setTransactions(newTransactions);
     saveToCloud({ transactions: newTransactions }); // Sync
   };
