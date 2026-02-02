@@ -12,7 +12,7 @@ interface OverviewProps {
 }
 
 const Overview: React.FC<OverviewProps> = ({ transactions, onFilterAccount, selectedYear, onYearChange }) => {
-  const [graphPeriod, setGraphPeriod] = useState<'WEEK' | 'QUARTER' | 'YEAR'>('YEAR');
+  const [graphPeriod, setGraphPeriod] = useState<'WEEK' | 'QUARTER' | 'YEAR'>('WEEK');
 
   const availableYears = useMemo(() => {
     const years = new Set<number>(transactions.map(t => new Date(t.date).getFullYear()));
