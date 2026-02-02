@@ -21,6 +21,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const [activeTab, setActiveTab] = useState<ReportType>('WEEKLY');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedQuarter, setSelectedQuarter] = useState<number>(Math.floor(new Date().getMonth() / 3) + 1);
   
   // Weekly Custom Range State
   const [selectedWeekDate, setSelectedWeekDate] = useState(new Date().toISOString().split('T')[0]);
@@ -345,27 +346,24 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       text += `\n*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
       
       // Request Section - Always based on Total Expenses now
-      text += `Hello @${selectedFinanceRep},\n`;
+      text += `Hello @${selectedFinanceRep}, `;
       text += `could you kindly send *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the above expenses for CM?\n`;
 
     } else if (activeTab === 'QUARTERLY') {
-        // Find Q1, Q2, Q3, Q4 based on data? No, aggregate whole year or show breakdown?
-        // Usually reports show the currently viewed data. 
-        // Analytical Data here computes 4 quarters. 
-        // Let's assume we want to share the summary of the whole year broken down by quarters OR the specific selected range if we had a quarter selector.
-        // Since we show all 4 quarters in the graph, let's list them.
+        const qName = `Q${selectedQuarter}`;
+        const qRange = getQuarterRangeName(selectedQuarter);
+        const qData = analyticalData.chartData.find(d => d.name === qName);
         
-        text += `*Fiscal Year:* ${selectedYear}\n\n`;
-        analyticalData.chartData.forEach(d => {
-            if (d.name.startsWith('Q')) {
-                const qIndex = parseInt(d.name.substring(1));
-                text += `*${d.name} (${getQuarterRangeName(qIndex)})*\n`;
-                text += `Income: ${formatCurrency(d.income)}\n`;
-                text += `Expense: ${formatCurrency(d.expense)}\n`;
-                text += `Net: ${formatCurrency(d.income - d.expense)}\n\n`;
-            }
-        });
-        text += `*Total Net Year:* ${formatCurrency(analyticalData.net)}\n`;
+        text += `*Quarterly Report: ${qName}*\n`;
+        text += `Period: ${qRange} ${selectedYear}\n\n`;
+        
+        if (qData) {
+            text += `Income: ${formatCurrency(qData.income)}\n`;
+            text += `Expense: ${formatCurrency(qData.expense)}\n`;
+            text += `*Net: ${formatCurrency(qData.income - qData.expense)}*\n`;
+        } else {
+            text += `No data available for ${qName}.\n`;
+        }
 
     } else {
       text += `*Period:* ${selectedYear} ${activeTab === 'MONTHLY' ? getMonthName(selectedMonth) : ''}\n\n`;
@@ -401,7 +399,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                      </span>
                  ) : (
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                        {activeTab === 'MONTHLY' ? getMonthName(selectedMonth) : ''} {selectedYear}
+                        {activeTab === 'MONTHLY' ? getMonthName(selectedMonth) : ''} 
+                        {activeTab === 'QUARTERLY' ? `Q${selectedQuarter} (${getQuarterRangeName(selectedQuarter)})` : ''}
+                        {' '}{selectedYear}
                     </span>
                  )}
               </div>
@@ -414,6 +414,14 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                              <div className="relative flex-1 sm:flex-none">
                                 <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))} className="w-full appearance-none bg-gray-50 border border-gray-200 text-gray-700 text-xs font-black uppercase tracking-widest py-4 pl-4 pr-10 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary/10 cursor-pointer">
                                     {Array.from({length: 12}).map((_, i) => <option key={i} value={i}>{getMonthName(i)}</option>)}
+                                </select>
+                                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                             </div>
+                        )}
+                        {activeTab === 'QUARTERLY' && (
+                             <div className="relative flex-1 sm:flex-none">
+                                <select value={selectedQuarter} onChange={(e) => setSelectedQuarter(Number(e.target.value))} className="w-full appearance-none bg-gray-50 border border-gray-200 text-gray-700 text-xs font-black uppercase tracking-widest py-4 pl-4 pr-10 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary/10 cursor-pointer">
+                                    {[1, 2, 3, 4].map(q => <option key={q} value={q}>Q{q} ({getQuarterRangeName(q)})</option>)}
                                 </select>
                                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                              </div>
