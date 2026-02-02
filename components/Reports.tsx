@@ -319,8 +319,15 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   };
 
   const generateAndOpenWhatsApp = () => {
+    // Generate DD/MM/YYYY Format
+    const reportDate = new Date().toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+
     let text = `*CM ${activeTab} Report*\n`;
-    text += `${new Date().toLocaleDateString()}\n`;
+    text += `${reportDate}\n`;
     text += `---------------------------\n`;
 
     if (activeTab === 'WEEKLY') {

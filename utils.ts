@@ -10,7 +10,7 @@ export const formatCurrency = (amount: number) => {
 };
 
 export const parseDate = (dateStr: string): string => {
-  // Handle D/M/YYYY or DD/MM/YYYY to YYYY-MM-DD
+  // Handle DD/MM/YYYY or DD/MM/YYYY to YYYY-MM-DD
   if (!dateStr) return new Date().toISOString().split('T')[0];
   const parts = dateStr.split('/');
   if (parts.length === 3) {
