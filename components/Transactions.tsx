@@ -482,6 +482,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                             >
                                 <option value={25}>25</option>
                                 <option value={50}>50</option>
+                                <option value={200}>200</option>
                                 <option value={-1}>All</option>
                             </select>
                         </div>
@@ -491,7 +492,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                             onChange={(e) => setFilterAccount(e.target.value)}
                             className="h-12 md:h-[58px] px-4 flex-1 bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:outline-none shadow-sm cursor-pointer"
                         >
-                            <option value="ALL">All Acc.</option>
+                            <option value="ALL">All</option>
                             {accounts.map(a => <option key={a} value={a}>{a}</option>)}
                         </select>
                     </div>

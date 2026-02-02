@@ -320,10 +320,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       text += `\n*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
       
       // Request Section - Always based on Total Expenses now
-      text += `\n*PAYMENT REQUEST*\n`;
-      text += `Hello ${selectedFinanceRep},\n`;
-      text += `Could you kindly send *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the following for CM?
-.\n`;
+      text += `Hello @${selectedFinanceRep},\n`;
+      text += `could you kindly send *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the above expenses for CM?\n`;
 
     } else {
       text += `*Period:* ${selectedYear} ${activeTab === 'MONTHLY' ? getMonthName(selectedMonth) : ''}\n\n`;
