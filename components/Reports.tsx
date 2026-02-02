@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, TransactionType, User, AccountType } from '../types';
 import { formatCurrency } from '../utils';
@@ -21,7 +21,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const [activeTab, setActiveTab] = useState<ReportType>('WEEKLY');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  
+  // Weekly Custom Range State
   const [selectedWeekDate, setSelectedWeekDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customWeekStart, setCustomWeekStart] = useState('');
+  const [customWeekEnd, setCustomWeekEnd] = useState('');
+
 
   // WhatsApp Request Flow State
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -48,16 +53,31 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     return new Date(2025, monthIndex, 1).toLocaleString('default', { month: 'long' });
   };
 
+  const getQuarterRangeName = (quarterIndex: number) => {
+      const startMonth = (quarterIndex - 1) * 3;
+      const endMonth = startMonth + 2;
+      const start = new Date(2025, startMonth, 1).toLocaleString('default', { month: 'short' });
+      const end = new Date(2025, endMonth, 1).toLocaleString('default', { month: 'short' });
+      return `${start} - ${end}`;
+  };
+
   const getWeekRange = (dateStr: string) => {
     const date = new Date(dateStr);
     const day = date.getDay();
     const diff = date.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(date.setDate(diff));
-    const sunday = new Date(date.setDate(monday.getDate() + 6));
+    const saturday = new Date(date.setDate(monday.getDate() + 5)); // Mon to Sat
     monday.setHours(0,0,0,0);
-    sunday.setHours(23,59,59,999);
-    return { start: monday, end: sunday };
+    saturday.setHours(23,59,59,999);
+    return { start: monday, end: saturday };
   };
+
+  // Sync custom dates when main date picker changes
+  useEffect(() => {
+      const { start, end } = getWeekRange(selectedWeekDate);
+      setCustomWeekStart(start.toISOString().split('T')[0]);
+      setCustomWeekEnd(end.toISOString().split('T')[0]);
+  }, [selectedWeekDate]);
 
   const availableYears = useMemo(() => {
     const years = new Set<number>(transactions.map(t => new Date(t.date).getFullYear()));
@@ -67,7 +87,14 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
   // --- Data Calculations: Weekly ---
   const weeklyStats = useMemo(() => {
-    const { start, end } = getWeekRange(selectedWeekDate);
+    // Use custom range if set, otherwise fallback to calculated range
+    const start = customWeekStart ? new Date(customWeekStart) : getWeekRange(selectedWeekDate).start;
+    const end = customWeekEnd ? new Date(customWeekEnd) : getWeekRange(selectedWeekDate).end;
+    
+    // Ensure end of day for the end date
+    end.setHours(23,59,59,999);
+    start.setHours(0,0,0,0);
+
     const weekTrans = transactions.filter(t => {
       const d = new Date(t.date);
       return !t.isArchived && d >= start && d <= end;
@@ -114,9 +141,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
         offerings: { cash: offeringsCash, momo: offeringsMomo },
         snacks: { cash: snacksCash, momo: snacksMomo },
         cashBalance, 
-        range: `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`
+        range: `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
     };
-  }, [transactions, selectedWeekDate]);
+  }, [transactions, selectedWeekDate, customWeekStart, customWeekEnd]);
 
   // --- Analytical Calculations ---
   const analyticalData = useMemo(() => {
@@ -211,12 +238,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       finally { setIsAutoPlanning(false); }
   };
 
-  const handleReconcileCash = () => {
-    alert("Reconciliation is now automated when you commit the weekly report.");
-  };
-
   const saveWeeklyData = () => {
-    // Use the user-selected date, not "today"
+    // Use the user-selected date (Week Date)
     const entryDate = selectedWeekDate;
     const batchToAdd: Omit<Transaction, 'id'>[] = [];
     
@@ -300,11 +323,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     text += `---------------------------\n`;
 
     if (activeTab === 'WEEKLY') {
-      text += `*Period:* ${weeklyStats.range}\n\n`;
       text += `*OFFERINGS*\nCash: ${formatCurrency(weeklyStats.offerings.cash)}\nMoMo: ${formatCurrency(weeklyStats.offerings.momo)}\n\n*Total Offerings: ${formatCurrency(weeklyStats.totalIncome)}*\n\n`;
       
       text += `*EXPENSES*\n`;
-      const { start, end } = getWeekRange(selectedWeekDate);
+      const start = customWeekStart ? new Date(customWeekStart) : getWeekRange(selectedWeekDate).start;
+      const end = customWeekEnd ? new Date(customWeekEnd) : getWeekRange(selectedWeekDate).end;
+      end.setHours(23,59,59,999);
+      
       const weeklyExpenses = transactions.filter(t => !t.isArchived && t.type === TransactionType.EXPENSE && new Date(t.date) >= start && new Date(t.date) <= end);
 
       if (weeklyExpenses.length > 0) {
@@ -322,6 +347,25 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       // Request Section - Always based on Total Expenses now
       text += `Hello @${selectedFinanceRep},\n`;
       text += `could you kindly send *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the above expenses for CM?\n`;
+
+    } else if (activeTab === 'QUARTERLY') {
+        // Find Q1, Q2, Q3, Q4 based on data? No, aggregate whole year or show breakdown?
+        // Usually reports show the currently viewed data. 
+        // Analytical Data here computes 4 quarters. 
+        // Let's assume we want to share the summary of the whole year broken down by quarters OR the specific selected range if we had a quarter selector.
+        // Since we show all 4 quarters in the graph, let's list them.
+        
+        text += `*Fiscal Year:* ${selectedYear}\n\n`;
+        analyticalData.chartData.forEach(d => {
+            if (d.name.startsWith('Q')) {
+                const qIndex = parseInt(d.name.substring(1));
+                text += `*${d.name} (${getQuarterRangeName(qIndex)})*\n`;
+                text += `Income: ${formatCurrency(d.income)}\n`;
+                text += `Expense: ${formatCurrency(d.expense)}\n`;
+                text += `Net: ${formatCurrency(d.income - d.expense)}\n\n`;
+            }
+        });
+        text += `*Total Net Year:* ${formatCurrency(analyticalData.net)}\n`;
 
     } else {
       text += `*Period:* ${selectedYear} ${activeTab === 'MONTHLY' ? getMonthName(selectedMonth) : ''}\n\n`;
@@ -384,8 +428,18 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                )}
 
               {activeTab === 'WEEKLY' && (
-                <input type="date" className="p-3 border border-gray-200 rounded-2xl text-sm font-bold bg-white focus:ring-4 focus:ring-primary/10 outline-none w-full sm:w-auto"
-                  value={selectedWeekDate} onChange={(e) => setSelectedWeekDate(e.target.value)} />
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <input type="date" title="Select Week" className="p-3 border border-gray-200 rounded-2xl text-sm font-bold bg-white focus:ring-4 focus:ring-primary/10 outline-none w-full sm:w-auto"
+                      value={selectedWeekDate} onChange={(e) => setSelectedWeekDate(e.target.value)} />
+                    
+                    <div className="flex items-center gap-1 bg-gray-50 rounded-2xl p-1 border border-gray-100">
+                        <input type="date" className="bg-transparent text-[10px] font-bold outline-none p-2 w-24 text-gray-500" 
+                            value={customWeekStart} onChange={(e) => setCustomWeekStart(e.target.value)} />
+                        <span className="text-gray-300">-</span>
+                        <input type="date" className="bg-transparent text-[10px] font-bold outline-none p-2 w-24 text-gray-500" 
+                            value={customWeekEnd} onChange={(e) => setCustomWeekEnd(e.target.value)} />
+                    </div>
+                </div>
               )}
               
               <button onClick={handleShareClick} className="flex items-center justify-center px-6 py-4 bg-[#25D366] text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-[#128C7E] transition-all shadow-xl whitespace-nowrap active:scale-95">

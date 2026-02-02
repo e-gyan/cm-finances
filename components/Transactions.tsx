@@ -2,12 +2,13 @@ import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Transaction, TransactionType, AccountType, Category } from '../types';
 import { formatCurrency } from '../utils';
 import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check, ArrowRightLeft } from 'lucide-react';
+import { TransactionFilters } from '../App';
 
 interface TransactionsProps {
   transactions: Transaction[];
   categories: Category[];
   accounts: AccountType[];
-  preSelectedAccount: AccountType | null;
+  initialFilters: TransactionFilters;
   onAddTransaction: (t: Omit<Transaction, 'id'> | Omit<Transaction, 'id'>[]) => void;
   onUpdateTransaction: (t: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
@@ -15,6 +16,12 @@ interface TransactionsProps {
 }
 
 type TabType = 'INCOME' | 'EXPENSE' | 'TRANSFER';
+
+const SHORT_ACCOUNT_LABELS: Record<AccountType, string> = {
+    [AccountType.MOMO]: 'MoMo',
+    [AccountType.CASH]: 'Cash',
+    [AccountType.OTHER]: 'Others'
+};
 
 // --- Sub-Components ---
 
@@ -70,7 +77,7 @@ const HistoryList = React.memo(({
 
                         {/* Account Badge */}
                         <span className="px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 font-bold uppercase tracking-wider truncate max-w-[100px]">
-                            {t.type === TransactionType.TRANSFER ? `${t.accountId} → ${t.toAccountId}` : t.accountId}
+                            {t.type === TransactionType.TRANSFER ? `${SHORT_ACCOUNT_LABELS[t.accountId] || t.accountId} → ${SHORT_ACCOUNT_LABELS[t.toAccountId!] || t.toAccountId}` : (SHORT_ACCOUNT_LABELS[t.accountId] || t.accountId)}
                         </span>
 
                         {/* Notes (Truncated) */}
@@ -194,7 +201,7 @@ const EntryForm = ({
                                     className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
                                 >
                                     <option value="">Select Account...</option>
-                                    {accounts.map((a: string) => <option key={a} value={a}>{a}</option>)}
+                                    {accounts.map((a: string) => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
                                 </select>
                            </div>
                            <div className="relative">
@@ -208,7 +215,7 @@ const EntryForm = ({
                                     className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
                                 >
                                     <option value="">Select Account...</option>
-                                    {accounts.map((a: string) => <option key={a} value={a}>{a}</option>)}
+                                    {accounts.map((a: string) => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
                                 </select>
                            </div>
                            <div className="md:col-span-2">
@@ -232,7 +239,7 @@ const EntryForm = ({
                                     className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
                                 >
                                     <option value="">Select Account...</option>
-                                    {accounts.map((a: string) => <option key={a} value={a}>{a}</option>)}
+                                    {accounts.map((a: string) => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
                                 </select>
                            </div>
                            <div>
@@ -282,14 +289,18 @@ const Transactions: React.FC<TransactionsProps> = ({
   transactions, 
   categories, 
   accounts, 
-  preSelectedAccount,
+  initialFilters,
   onAddTransaction,
   onUpdateTransaction,
   onDeleteTransaction,
   filterYear
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('INCOME');
-  const [filterAccount, setFilterAccount] = useState<string>(preSelectedAccount || 'ALL');
+  
+  // Filter States - Multi-Select
+  const [selectedAccounts, setSelectedAccounts] = useState<AccountType[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<TransactionType[]>([]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm); // SMOOTH TYPING
   const [showArchived, setShowArchived] = useState(false);
@@ -315,15 +326,34 @@ const Transactions: React.FC<TransactionsProps> = ({
     receivedFromFinance: false
   }]);
 
+  // Sync Initial Filters from Overview
   useEffect(() => {
-    if (preSelectedAccount) setFilterAccount(preSelectedAccount);
-  }, [preSelectedAccount]);
+    if (initialFilters.accounts) setSelectedAccounts(initialFilters.accounts);
+    if (initialFilters.types) setSelectedTypes(initialFilters.types);
+    
+    // Auto-open filters if initial filters exist
+    if ((initialFilters.accounts && initialFilters.accounts.length > 0) || (initialFilters.types && initialFilters.types.length > 0)) {
+        setShowFilters(true);
+    }
+  }, [initialFilters]);
 
   // Reset Edit state when selection changes
   useEffect(() => {
       setIsEditingDetail(false);
       setEditDetailForm(null);
   }, [selectedTransaction]);
+
+  const toggleAccountFilter = (acc: AccountType) => {
+      setSelectedAccounts(prev => 
+          prev.includes(acc) ? prev.filter(a => a !== acc) : [...prev, acc]
+      );
+  };
+
+  const toggleTypeFilter = (type: TransactionType) => {
+      setSelectedTypes(prev => 
+          prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+      );
+  };
 
   const handleAddEntry = () => {
     setEntries([...entries, { 
@@ -407,14 +437,17 @@ const Transactions: React.FC<TransactionsProps> = ({
     return transactions
         .filter(t => showArchived ? true : !t.isArchived)
         .filter(t => new Date(t.date).getFullYear() === filterYear)
-        .filter(t => filterAccount === 'ALL' || t.accountId === filterAccount || t.toAccountId === filterAccount)
+        // Multi-select Account Filter
+        .filter(t => selectedAccounts.length === 0 || selectedAccounts.includes(t.accountId) || (t.toAccountId && selectedAccounts.includes(t.toAccountId)))
+        // Multi-select Type Filter
+        .filter(t => selectedTypes.length === 0 || selectedTypes.includes(t.type))
         .filter(t => 
           t.category.toLowerCase().includes(deferredSearchTerm.toLowerCase()) || 
           t.notes?.toLowerCase().includes(deferredSearchTerm.toLowerCase()) ||
           t.recipient?.toLowerCase().includes(deferredSearchTerm.toLowerCase())
         )
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, showArchived, filterYear, filterAccount, deferredSearchTerm]);
+  }, [transactions, showArchived, filterYear, selectedAccounts, selectedTypes, deferredSearchTerm]);
 
   const displayedList = itemsPerPage === -1 ? filteredList : filteredList.slice(0, itemsPerPage);
 
@@ -437,67 +470,97 @@ const Transactions: React.FC<TransactionsProps> = ({
 
       {/* History Feed List */}
       <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
-        <div className="p-4 md:p-10 border-b border-gray-50 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-gray-50/30">
-            <div className="flex justify-between w-full xl:w-auto items-center">
-                 <h3 className="font-black text-gray-900 text-lg md:text-xl tracking-tighter">History Feed</h3>
-                 {/* Mobile Filter Toggle */}
-                 <button 
-                    onClick={() => setShowFilters(!showFilters)} 
-                    className="md:hidden p-2 bg-white rounded-xl border border-gray-200 text-gray-500 shadow-sm"
-                 >
-                    <Filter size={20} />
-                 </button>
-            </div>
-
-            <div className={`flex-col md:flex-row gap-3 w-full xl:w-auto items-center animate-in slide-in-from-top-2 duration-300 ${showFilters ? 'flex' : 'hidden md:flex'}`}>
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input 
-                        type="text" 
-                        placeholder="Search..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-12 pr-6 py-3 md:py-4 bg-white border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 w-full shadow-sm"
-                    />
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                    <button
-                        onClick={() => setShowArchived(!showArchived)}
-                        className={`flex items-center justify-center gap-2 px-4 py-3 md:py-0 md:h-[58px] rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all shadow-sm ${
-                            showArchived ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
-                        }`}
+        <div className="p-4 md:p-8 border-b border-gray-50 flex flex-col gap-4 bg-gray-50/30">
+            
+            {/* Top Toolbar */}
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+                <div className="flex justify-between w-full xl:w-auto items-center">
+                    <h3 className="font-black text-gray-900 text-lg md:text-xl tracking-tighter">History Feed</h3>
+                    {/* Mobile Filter Toggle */}
+                    <button 
+                        onClick={() => setShowFilters(!showFilters)} 
+                        className="md:hidden p-2 bg-white rounded-xl border border-gray-200 text-gray-500 shadow-sm"
                     >
-                        {showArchived ? <EyeOff size={16} /> : <Eye size={16} />}
-                        <span className="md:hidden xl:inline">{showArchived ? 'Active Only' : 'Archived'}</span>
+                        <Filter size={20} />
                     </button>
-                    
+                </div>
+                
+                {/* Search & Actions */}
+                <div className="flex flex-col md:flex-row gap-2 w-full xl:w-auto">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input 
+                            type="text" 
+                            placeholder="Search..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-12 pr-6 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 w-full shadow-sm"
+                        />
+                    </div>
                     <div className="flex gap-2">
-                        <div className="relative h-12 md:h-[58px] flex-1">
+                        <button
+                            onClick={() => setShowArchived(!showArchived)}
+                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all shadow-sm ${
+                                showArchived ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
+                            }`}
+                        >
+                            {showArchived ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                         <div className="relative h-[42px] md:h-auto min-w-[80px]">
                             <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                             <select 
                                 value={itemsPerPage}
                                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                                className="pl-9 pr-8 h-full w-full bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:outline-none shadow-sm cursor-pointer appearance-none"
+                                className="pl-9 pr-4 h-full w-full bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:outline-none shadow-sm cursor-pointer appearance-none py-3"
                             >
                                 <option value={25}>25</option>
                                 <option value={50}>50</option>
-                                <option value={200}>200</option>
                                 <option value={-1}>All</option>
                             </select>
                         </div>
-
-                        <select 
-                            value={filterAccount}
-                            onChange={(e) => setFilterAccount(e.target.value)}
-                            className="h-12 md:h-[58px] px-4 flex-1 bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:outline-none shadow-sm cursor-pointer"
-                        >
-                            <option value="ALL">All</option>
-                            {accounts.map(a => <option key={a} value={a}>{a}</option>)}
-                        </select>
                     </div>
                 </div>
             </div>
+
+            {/* Filter Chips - Toggleable */}
+            <div className={`flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300 ${showFilters ? 'flex' : 'hidden md:flex'}`}>
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Type:</span>
+                    {[TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER].map(type => (
+                        <button
+                            key={type}
+                            onClick={() => toggleTypeFilter(type)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                                selectedTypes.includes(type)
+                                ? 'bg-gray-900 text-white border-gray-900 shadow-md'
+                                : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
+                            }`}
+                        >
+                            {type}
+                        </button>
+                    ))}
+                    {selectedTypes.length > 0 && <button onClick={() => setSelectedTypes([])} className="text-[10px] text-gray-400 hover:text-rose-500 px-2">Clear</button>}
+                </div>
+
+                 <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Account:</span>
+                    {accounts.map(acc => (
+                        <button
+                            key={acc}
+                            onClick={() => toggleAccountFilter(acc)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                                selectedAccounts.includes(acc)
+                                ? 'bg-gray-900 text-white border-gray-900 shadow-md'
+                                : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
+                            }`}
+                        >
+                            {SHORT_ACCOUNT_LABELS[acc] || acc}
+                        </button>
+                    ))}
+                     {selectedAccounts.length > 0 && <button onClick={() => setSelectedAccounts([])} className="text-[10px] text-gray-400 hover:text-rose-500 px-2">Clear</button>}
+                </div>
+            </div>
+
         </div>
         
         {/* Render Memoized List */}
@@ -599,7 +662,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                                     <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Account</label>
                                     <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none"
                                         value={editDetailForm.accountId} onChange={e => setEditDetailForm({...editDetailForm, accountId: e.target.value as any})}>
-                                        {accounts.map(a => <option key={a} value={a}>{a}</option>)}
+                                        {accounts.map(a => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
                                     </select>
                                 </div>
                                 {editDetailForm.type === TransactionType.TRANSFER && (
@@ -607,7 +670,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                                         <label className="text-[10px] font-black text-gray-400 mb-1 block uppercase tracking-widest">Dest. Account</label>
                                         <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold outline-none"
                                             value={editDetailForm.toAccountId} onChange={e => setEditDetailForm({...editDetailForm, toAccountId: e.target.value as any})}>
-                                            {accounts.map(a => <option key={a} value={a}>{a}</option>)}
+                                            {accounts.map(a => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
                                         </select>
                                     </div>
                                 )}
@@ -650,7 +713,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                                     <div className="p-3 bg-white rounded-xl text-primary shadow-sm"><CreditCard size={20}/></div>
                                     <div>
                                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Source Account</p>
-                                        <p className="font-bold text-gray-900">{selectedTransaction.accountId}</p>
+                                        <p className="font-bold text-gray-900">{SHORT_ACCOUNT_LABELS[selectedTransaction.accountId] || selectedTransaction.accountId}</p>
                                     </div>
                                 </div>
                                 {selectedTransaction.recipient && (
@@ -668,7 +731,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                                         <div className="p-3 bg-white rounded-xl text-primary shadow-sm"><ArrowRight size={20}/></div>
                                         <div>
                                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Destination</p>
-                                            <p className="font-bold text-gray-900">{selectedTransaction.toAccountId}</p>
+                                            <p className="font-bold text-gray-900">{SHORT_ACCOUNT_LABELS[selectedTransaction.toAccountId] || selectedTransaction.toAccountId}</p>
                                         </div>
                                     </div>
                                 )}

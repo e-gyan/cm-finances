@@ -3,15 +3,16 @@ import { Transaction, AccountType, TransactionType, Period } from '../types';
 import { formatCurrency } from '../utils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, TrendingDown, Wallet, CreditCard, Banknote, ChevronRight } from 'lucide-react';
+import { TransactionFilters } from '../App';
 
 interface OverviewProps {
   transactions: Transaction[];
-  onFilterAccount: (account: AccountType | null) => void;
+  onNavigate: (filters: TransactionFilters) => void;
   selectedYear: number;
   onYearChange: (year: number) => void;
 }
 
-const Overview: React.FC<OverviewProps> = ({ transactions, onFilterAccount, selectedYear, onYearChange }) => {
+const Overview: React.FC<OverviewProps> = ({ transactions, onNavigate, selectedYear, onYearChange }) => {
   const [graphPeriod, setGraphPeriod] = useState<'WEEK' | 'QUARTER' | 'YEAR'>('WEEK');
 
   const availableYears = useMemo(() => {
@@ -91,27 +92,36 @@ const Overview: React.FC<OverviewProps> = ({ transactions, onFilterAccount, sele
 
       {/* Snippets - Improved Grid for Tablets (sm:grid-cols-2) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 flex items-center justify-between shadow-sm">
+        <button 
+            onClick={() => onNavigate({ types: [TransactionType.INCOME] })}
+            className="bg-emerald-50 p-6 rounded-[2rem] border border-emerald-100 flex items-center justify-between shadow-sm hover:scale-[1.02] transition-transform active:scale-95 text-left group"
+        >
           <div>
-            <p className="text-emerald-600 font-black text-[10px] uppercase tracking-widest">Total Income</p>
+            <p className="text-emerald-600 font-black text-[10px] uppercase tracking-widest group-hover:underline">Total Income</p>
             <p className="text-2xl md:text-3xl font-black text-emerald-900 mt-2 tracking-tighter">{formatCurrency(totals.income)}</p>
           </div>
           <div className="p-3 bg-white rounded-full text-emerald-600 shadow-sm">
             <TrendingUp size={24} />
           </div>
-        </div>
-        <div className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100 flex items-center justify-between shadow-sm">
+        </button>
+        <button 
+            onClick={() => onNavigate({ types: [TransactionType.EXPENSE] })}
+            className="bg-rose-50 p-6 rounded-[2rem] border border-rose-100 flex items-center justify-between shadow-sm hover:scale-[1.02] transition-transform active:scale-95 text-left group"
+        >
           <div>
-            <p className="text-rose-600 font-black text-[10px] uppercase tracking-widest">Total Expenses</p>
+            <p className="text-rose-600 font-black text-[10px] uppercase tracking-widest group-hover:underline">Total Expenses</p>
             <p className="text-2xl md:text-3xl font-black text-rose-900 mt-2 tracking-tighter">{formatCurrency(totals.expense)}</p>
           </div>
           <div className="p-3 bg-white rounded-full text-rose-600 shadow-sm">
             <TrendingDown size={24} />
           </div>
-        </div>
-        <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 flex items-center justify-between shadow-sm sm:col-span-2 lg:col-span-1">
+        </button>
+        <button 
+            onClick={() => onNavigate({})} // Show all
+            className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 flex items-center justify-between shadow-sm sm:col-span-2 lg:col-span-1 hover:scale-[1.02] transition-transform active:scale-95 text-left group"
+        >
           <div>
-            <p className="text-blue-600 font-black text-[10px] uppercase tracking-widest">Net Balance</p>
+            <p className="text-blue-600 font-black text-[10px] uppercase tracking-widest group-hover:underline">Net Balance</p>
             <p className={`text-2xl md:text-3xl font-black mt-2 tracking-tighter ${totals.balance >= 0 ? 'text-blue-900' : 'text-rose-700'}`}>
                 {formatCurrency(totals.balance)}
             </p>
@@ -119,7 +129,7 @@ const Overview: React.FC<OverviewProps> = ({ transactions, onFilterAccount, sele
           <div className="p-3 bg-white rounded-full text-blue-600 shadow-sm">
             <Wallet size={24} />
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Account Cards - Improved Grid for Tablets */}
@@ -127,7 +137,7 @@ const Overview: React.FC<OverviewProps> = ({ transactions, onFilterAccount, sele
         {[AccountType.MOMO, AccountType.CASH, AccountType.OTHER].map((acc) => (
           <button
             key={acc}
-            onClick={() => onFilterAccount(acc)}
+            onClick={() => onNavigate({ accounts: [acc] })}
             className="group relative overflow-hidden bg-white p-6 rounded-[2rem] shadow-sm border border-gray-200 hover:shadow-xl hover:shadow-gray-200/50 transition-all text-left active:scale-95 duration-200"
           >
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">

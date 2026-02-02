@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LayoutDashboard, Receipt, Settings as SettingsIcon, PieChart, ChevronLeft, ChevronRight, Cloud, CloudOff, Loader2, Check } from 'lucide-react';
-import { Transaction, Category, User, AccountType } from './types';
+import { Transaction, Category, User, AccountType, TransactionType } from './types';
 import { INITIAL_TRANSACTIONS, INITIAL_CATEGORIES, INITIAL_USERS } from './utils';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -24,6 +24,11 @@ const loadState = <T,>(key: string, fallback: T): T => {
   return fallback;
 };
 
+export interface TransactionFilters {
+  accounts?: AccountType[];
+  types?: TransactionType[];
+}
+
 function App() {
   // Cloud Configuration
   const [binId, setBinId] = useState<string>(() => localStorage.getItem('THESAURUS_BIN_ID') || '696a4288ae596e708fe088b1');
@@ -44,7 +49,9 @@ function App() {
   
   const [activeView, setActiveView] = useState<'OVERVIEW' | 'TRANSACTIONS' | 'REPORTS' | 'SETTINGS'>('OVERVIEW');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Default to collapsed
-  const [preSelectedAccount, setPreSelectedAccount] = useState<AccountType | null>(null);
+  
+  // Navigation Filters
+  const [initialFilters, setInitialFilters] = useState<TransactionFilters>({});
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   // --- CLOUD SYNC LOGIC ---
@@ -136,8 +143,8 @@ function App() {
 
   // --- ACTIONS ---
 
-  const handleAccountFilter = (account: AccountType | null) => {
-    setPreSelectedAccount(account);
+  const handleNavigateToTransactions = (filters: TransactionFilters) => {
+    setInitialFilters(filters);
     setActiveView('TRANSACTIONS');
   };
 
@@ -382,7 +389,7 @@ function App() {
           <div className={activeView === 'OVERVIEW' ? 'block' : 'hidden'}>
             <Overview 
                 transactions={transactions} 
-                onFilterAccount={handleAccountFilter} 
+                onNavigate={handleNavigateToTransactions} 
                 selectedYear={selectedYear}
                 onYearChange={setSelectedYear}
             />
@@ -393,7 +400,7 @@ function App() {
                 transactions={transactions}
                 categories={categories}
                 accounts={[AccountType.MOMO, AccountType.CASH, AccountType.OTHER]}
-                preSelectedAccount={preSelectedAccount}
+                initialFilters={initialFilters}
                 onAddTransaction={addTransaction}
                 onUpdateTransaction={updateTransaction}
                 onDeleteTransaction={deleteTransaction}
