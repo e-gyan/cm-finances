@@ -53,25 +53,42 @@ const Overview: React.FC<OverviewProps> = ({ transactions, onNavigate, selectedY
   }, [filteredTransactions]);
 
   const chartData = useMemo(() => {
-    const data: Record<string, { name: string; income: number; expense: number }> = {};
+    const data: Record<string, { name: string; income: number; expense: number; sortOrder: number }> = {};
+    
     // Exclude Transfers from the Graph to show P&L Trend
     filteredTransactions.filter(t => t.type !== TransactionType.TRANSFER).forEach(t => {
       let key = '';
+      let sortOrder = 0;
       const date = new Date(t.date);
+      
       if (graphPeriod === 'YEAR') {
         key = date.toLocaleString('default', { month: 'short' });
+        sortOrder = date.getMonth();
       } else if (graphPeriod === 'QUARTER') {
-        const q = Math.floor((date.getMonth() + 3) / 3);
+        const q = Math.floor((date.getMonth() + 3) / 3); // 1-4
         key = `Q${q}`;
+        sortOrder = q;
       } else {
-        const firstDay = new Date(date.setDate(date.getDate() - date.getDay()));
+        // Week grouping (Sunday start)
+        const d = new Date(t.date);
+        const day = d.getDay();
+        const diff = d.getDate() - day; // Adjust to Sunday
+        const firstDay = new Date(d.setDate(diff));
+        firstDay.setHours(0,0,0,0);
+        
         key = `${firstDay.getDate()}/${firstDay.getMonth()+1}`;
+        sortOrder = firstDay.getTime();
       }
-      if (!data[key]) data[key] = { name: key, income: 0, expense: 0 };
+
+      if (!data[key]) {
+          data[key] = { name: key, income: 0, expense: 0, sortOrder };
+      }
+      
       if (t.type === TransactionType.INCOME) data[key].income += t.amount;
       if (t.type === TransactionType.EXPENSE) data[key].expense += t.amount;
     });
-    return Object.values(data);
+    
+    return Object.values(data).sort((a, b) => a.sortOrder - b.sortOrder);
   }, [filteredTransactions, graphPeriod]);
 
   return (
