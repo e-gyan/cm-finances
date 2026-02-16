@@ -345,7 +345,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
               if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
                   t.meta.breakdown.forEach((item: {item: string, amount: number}) => text += `- ${item.item}: ${formatCurrency(item.amount)} (${t.accountId})\n`);
               } else {
-                  text += `- ${t.notes || t.category}: ${formatCurrency(t.amount)} (${t.accountId})\n`;
+                  text += `- ${t.notes || t.category}: ${formatCurrency(t.amount)}\n`;
               }
           });
       } else { text += `No expenses recorded.\n`; }
