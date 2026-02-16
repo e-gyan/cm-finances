@@ -354,7 +354,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       
       // Request Section - Always based on Total Expenses now
       text += `Hello @${selectedFinanceRep}, `;
-      text += `could you kindly send *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the above expenses for CM?\n`;
+      text += `could you kindly assist CM with *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the above expenses?\n`;
 
     } else if (activeTab === 'QUARTERLY') {
         const qName = `Q${selectedQuarter}`;
