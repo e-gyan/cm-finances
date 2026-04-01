@@ -864,7 +864,7 @@ const Settings: React.FC<SettingsProps> = ({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="bg-gray-800 p-3 rounded-xl border border-gray-700">
                                     <span className="text-emerald-400 text-[10px] font-black uppercase block mb-1">Scenario A: Surplus</span>
-                                    <p className="text-[10px] text-gray-300">Cash Balance > 0. Action: Initiate Transfer transaction moving excess Cash to MoMo (Finance).</p>
+                                    <p className="text-[10px] text-gray-300">Cash Balance &gt; 0. Action: Initiate Transfer transaction moving excess Cash to MoMo (Finance).</p>
                                 </div>
                                 <div className="bg-gray-800 p-3 rounded-xl border border-gray-700">
                                     <span className="text-rose-400 text-[10px] font-black uppercase block mb-1">Scenario B: Deficit</span>

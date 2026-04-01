@@ -37,6 +37,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
   // AI Loading State
   const [isAutoPlanning, setIsAutoPlanning] = useState(false);
+  const [smartPlanRange, setSmartPlanRange] = useState<'ALL' | '1_MONTH' | '2_WEEKS'>('ALL');
 
   // --- Weekly Input States ---
   const [offeringsInput, setOfferingsInput] = useState<{type: 'CASH' | 'MOMO', amount: string}[]>([
@@ -221,8 +222,21 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       setIsAutoPlanning(true);
       try {
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          const historyContext = transactions
-            .filter(t => t.type === TransactionType.EXPENSE && t.category === 'Snacks & Meals')
+          
+          let filteredTransactions = transactions.filter(t => t.type === TransactionType.EXPENSE && t.category === 'Snacks & Meals');
+          
+          if (smartPlanRange !== 'ALL') {
+              const now = new Date();
+              const cutoff = new Date();
+              if (smartPlanRange === '1_MONTH') {
+                  cutoff.setMonth(now.getMonth() - 1);
+              } else if (smartPlanRange === '2_WEEKS') {
+                  cutoff.setDate(now.getDate() - 14);
+              }
+              filteredTransactions = filteredTransactions.filter(t => new Date(t.date) >= cutoff);
+          }
+
+          const historyContext = filteredTransactions
             .slice(0, 20)
             .map(t => `${t.notes || 'Expense'}: ${t.amount} GHS`)
             .join('\n');
@@ -534,9 +548,21 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                              </div>
                           </div>
                       </div>
-                      <button onClick={handleAutoPlan} disabled={isAutoPlanning} className="flex items-center gap-2 px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-violet-200 transition-colors disabled:opacity-50">
-                         {isAutoPlanning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}{isAutoPlanning ? 'Thinking...' : 'Smart Plan'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                          <select 
+                              value={smartPlanRange}
+                              onChange={(e) => setSmartPlanRange(e.target.value as any)}
+                              className="text-[9px] font-black uppercase tracking-widest bg-violet-50 rounded-lg px-2 py-1.5 outline-none cursor-pointer border-none text-violet-700 hover:bg-violet-100"
+                              title="Smart Plan History Range"
+                          >
+                              <option value="ALL">All History</option>
+                              <option value="1_MONTH">Past Month</option>
+                              <option value="2_WEEKS">Past 2 Weeks</option>
+                          </select>
+                          <button onClick={handleAutoPlan} disabled={isAutoPlanning} className="flex items-center gap-2 px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-violet-200 transition-colors disabled:opacity-50">
+                             {isAutoPlanning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}{isAutoPlanning ? 'Thinking...' : 'Smart Plan'}
+                          </button>
+                      </div>
                   </div>
 
                   <div className="space-y-4">
