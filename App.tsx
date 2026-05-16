@@ -32,7 +32,7 @@ export interface TransactionFilters {
 function App() {
   // Cloud Configuration
   const [binId, setBinId] = useState<string>(() => localStorage.getItem('THESAURUS_BIN_ID') || '696a4288ae596e708fe088b1');
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('THESAURUS_API_KEY') || '$2a$10$ND0zIcPdo58JCZimZAcwRO.hL596gLZ3bxo/F0Po4bcSu.b0nvjEa');
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('THESAURUS_API_KEY') || '$2a$10$K5M6PsdqUpAmMJHp06t1PeEK2tabwlgLoFMHLo/yEWV5ndxGCMcRu');
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
