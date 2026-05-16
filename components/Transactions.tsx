@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Transaction, TransactionType, AccountType, Category } from '../types';
 import { formatCurrency } from '../utils';
-import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check, ArrowRightLeft } from 'lucide-react';
+import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check, ArrowRightLeft, Download } from 'lucide-react';
 import { TransactionFilters } from '../App';
+import * as XLSX from 'xlsx';
 
 interface TransactionsProps {
   transactions: Transaction[];
@@ -451,6 +452,24 @@ const Transactions: React.FC<TransactionsProps> = ({
 
   const displayedList = itemsPerPage === -1 ? filteredList : filteredList.slice(0, itemsPerPage);
 
+  const exportToExcel = () => {
+    const headers = ['Date', 'Type', 'Category', 'Amount', 'Account', 'Destination Account', 'Notes'];
+    const rows = filteredList.map(t => [
+      t.date,
+      t.type,
+      t.category,
+      t.type === TransactionType.EXPENSE ? -t.amount : t.amount,
+      SHORT_ACCOUNT_LABELS[t.accountId] || t.accountId,
+      t.toAccountId ? (SHORT_ACCOUNT_LABELS[t.toAccountId] || t.toAccountId) : '',
+      t.notes || ''
+    ]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
+    XLSX.writeFile(workbook, `${filterYear}-finance-records.xlsx`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Desktop Entry Form Card - Hidden on Mobile */}
@@ -487,6 +506,13 @@ const Transactions: React.FC<TransactionsProps> = ({
                 
                 {/* Search & Actions */}
                 <div className="flex flex-col md:flex-row gap-2 w-full xl:w-auto">
+                    <button
+                        onClick={exportToExcel}
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-100 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm"
+                        title="Export to Excel"
+                    >
+                        <Download size={16} /> <span className="hidden xl:inline">Export</span>
+                    </button>
                     <div className="relative flex-1">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input 

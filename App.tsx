@@ -67,7 +67,7 @@ function App() {
     };
 
     try {
-        await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -75,10 +75,15 @@ function App() {
             },
             body: JSON.stringify(payload)
         });
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
         setLastSyncTime(new Date());
     } catch (error) {
         console.error("Cloud Sync Failed", error);
-        alert("Failed to sync with Cloud. Check your internet or API credentials.");
+        // We only alert the user if they manually did a commit, but often we auto-save.
+        // It's better to fail silently on auto-save or show a subtle UI indicator, but for now we'll keep the console log.
     } finally {
         setIsSyncing(false);
     }
@@ -93,7 +98,10 @@ function App() {
                   'X-Master-Key': apiKey
               }
           });
-          if (!res.ok) throw new Error("Failed to fetch");
+          if (!res.ok) {
+              const errorText = await res.text();
+              throw new Error(`HTTP ${res.status}: ${errorText}`);
+          }
           const data = await res.json();
           const record = data.record;
 
@@ -103,7 +111,7 @@ function App() {
           
           setLastSyncTime(new Date());
       } catch (error) {
-          console.error("Load Failed", error);
+          console.error("Load Failed. The Cloud storage (JSONBin) might be rate-limited or the API key is invalid. Please check Settings > Cloud Sync.", error);
           // Don't alert on auto-load to avoid annoying user, just log
       } finally {
           setIsSyncing(false);
