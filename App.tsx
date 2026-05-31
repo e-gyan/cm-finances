@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Receipt, Settings as SettingsIcon, PieChart, ChevronLeft, ChevronRight, Cloud, CloudOff, Loader2, Check } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings as SettingsIcon, PieChart, ChevronLeft, ChevronRight, Cloud, CloudOff, Loader2, Check, LogOut } from 'lucide-react';
 import { Transaction, Category, User, AccountType, TransactionType } from './types';
 import { INITIAL_TRANSACTIONS, INITIAL_CATEGORIES, INITIAL_USERS } from './utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,6 +9,7 @@ import Transactions from './components/Transactions';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import ChatAssistant from './components/ChatAssistant';
+import Login from './components/Login';
 
 // Helper to load from storage or fallback
 const loadState = <T,>(key: string, fallback: T): T => {
@@ -43,10 +44,35 @@ function App() {
   const [categories, setCategories] = useState<Category[]>(() => 
     loadState('THESAURUS_CATEGORIES', INITIAL_CATEGORIES)
   );
-  const [users, setUsers] = useState<User[]>(() => 
-    loadState('THESAURUS_USERS', INITIAL_USERS)
-  );
+  const [users, setUsers] = useState<User[]>(() => {
+    const loadedUsers = loadState<User[]>('THESAURUS_USERS', INITIAL_USERS);
+    const hasMigrated = localStorage.getItem('THESAURUS_HASH_MIGRATED_V2');
+    
+    if (!hasMigrated) {
+        localStorage.setItem('THESAURUS_HASH_MIGRATED_V2', 'true');
+        return loadedUsers.map(u => {
+            if (u.id === 'u1') return { ...u, accessCode: '5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5' }; // 12345
+            if (u.id === 'u2') return { ...u, accessCode: '38ccf618bc32befde7649d21ce9a4918e938da641dedfc176efeb622a559eeb6' }; // Default finance
+            return u;
+        });
+    }
+
+    // Migrate old plain text passwords to hashed versions so existing users aren't locked out.
+    return loadedUsers.map(u => {
+        if (u.id === 'u1' && (!u.accessCode || u.accessCode.length !== 64)) {
+            return { ...u, accessCode: '5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5' };
+        }
+        if (u.id === 'u2' && (!u.accessCode || u.accessCode.length !== 64)) {
+            return { ...u, accessCode: '38ccf618bc32befde7649d21ce9a4918e938da641dedfc176efeb622a559eeb6' };
+        }
+        return u;
+    });
+  });
   
+  const [currentUser, setCurrentUser] = useState<User | null>(() => 
+    loadState('THESAURUS_CURRENT_USER', null)
+  );
+
   const [activeView, setActiveView] = useState<'OVERVIEW' | 'TRANSACTIONS' | 'REPORTS' | 'SETTINGS'>('OVERVIEW');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Default to collapsed
   
@@ -137,6 +163,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem('THESAURUS_USERS', JSON.stringify(users));
   }, [users]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('THESAURUS_CURRENT_USER', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('THESAURUS_CURRENT_USER');
+    }
+  }, [currentUser]);
 
   // Update Credentials
   const updateCloudConfig = (newBinId: string, newApiKey: string) => {
@@ -249,12 +283,22 @@ function App() {
     }
   };
 
+  const hasPermission = (perm: string) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'ADMIN') return true;
+    return currentUser.permissions?.includes(perm as any) || false;
+  };
+
   const navItems = [
-    { id: 'OVERVIEW', label: 'Overview', icon: LayoutDashboard },
-    { id: 'TRANSACTIONS', label: 'Transactions', icon: Receipt },
-    { id: 'REPORTS', label: 'Reports', icon: PieChart },
-    { id: 'SETTINGS', label: 'Settings', icon: SettingsIcon },
-  ];
+    { id: 'OVERVIEW', label: 'Overview', icon: LayoutDashboard, perm: 'VIEW_OVERVIEW' },
+    { id: 'TRANSACTIONS', label: 'Transactions', icon: Receipt, perm: 'VIEW_TRANSACTIONS' },
+    { id: 'REPORTS', label: 'Reports', icon: PieChart, perm: 'VIEW_REPORTS' },
+    { id: 'SETTINGS', label: 'Settings', icon: SettingsIcon, perm: 'VIEW_SETTINGS' },
+  ].filter(item => hasPermission(item.perm));
+
+  if (!currentUser) {
+    return <Login users={users} onLogin={setCurrentUser} />;
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans text-slate-900">
@@ -302,6 +346,15 @@ function App() {
         
         {!isSidebarCollapsed && (
           <div className="p-6 border-t border-gray-100 animate-in fade-in duration-500 space-y-2">
+            <div className="flex items-center justify-between bg-gray-50 p-3 rounded-2xl mb-2 border border-gray-100">
+               <div className="flex flex-col min-w-0 pr-2">
+                 <span className="text-xs font-black text-gray-900 truncate">{currentUser.name}</span>
+                 <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{currentUser.role}</span>
+               </div>
+               <button onClick={() => setCurrentUser(null)} className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                  <LogOut size={16} />
+               </button>
+            </div>
             <div className={`p-3 rounded-xl flex items-center gap-3 transition-colors duration-300 ${
               !binId ? 'bg-gray-100 text-gray-500' :
               isSyncing ? 'bg-blue-50 text-blue-700' :
@@ -403,7 +456,7 @@ function App() {
             />
           </div>
           
-          <div className={activeView === 'TRANSACTIONS' ? 'block' : 'hidden'}>
+          <div className={activeView === 'TRANSACTIONS' && hasPermission('VIEW_TRANSACTIONS') ? 'block' : 'hidden'}>
             <Transactions 
                 transactions={transactions}
                 categories={categories}
@@ -413,10 +466,11 @@ function App() {
                 onUpdateTransaction={updateTransaction}
                 onDeleteTransaction={deleteTransaction}
                 filterYear={selectedYear}
+                canEdit={hasPermission('EDIT_TRANSACTIONS')}
             />
           </div>
 
-          <div className={activeView === 'REPORTS' ? 'block' : 'hidden'}>
+          <div className={activeView === 'REPORTS' && hasPermission('VIEW_REPORTS') ? 'block' : 'hidden'}>
              <Reports 
                 transactions={transactions}
                 users={users}
@@ -425,7 +479,7 @@ function App() {
              />
           </div>
 
-          <div className={activeView === 'SETTINGS' ? 'block' : 'hidden'}>
+          <div className={activeView === 'SETTINGS' && hasPermission('VIEW_SETTINGS') ? 'block' : 'hidden'}>
              <Settings 
                 transactions={transactions}
                 categories={categories}
@@ -441,6 +495,7 @@ function App() {
                 cloudConfig={{ binId, apiKey }}
                 onUpdateCloudConfig={updateCloudConfig}
                 onUserAction={handleUserAction}
+                currentUser={currentUser}
              />
           </div>
         </div>

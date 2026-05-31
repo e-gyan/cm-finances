@@ -14,6 +14,7 @@ interface TransactionsProps {
   onUpdateTransaction: (t: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
   filterYear: number;
+  canEdit?: boolean;
 }
 
 type TabType = 'INCOME' | 'EXPENSE' | 'TRANSFER';
@@ -294,7 +295,8 @@ const Transactions: React.FC<TransactionsProps> = ({
   onAddTransaction,
   onUpdateTransaction,
   onDeleteTransaction,
-  filterYear
+  filterYear,
+  canEdit = false
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('INCOME');
   
@@ -472,19 +474,21 @@ const Transactions: React.FC<TransactionsProps> = ({
   return (
     <div className="space-y-6">
       {/* Desktop Entry Form Card - Hidden on Mobile */}
-      <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden mb-6">
-        <EntryForm 
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            entries={entries}
-            handleRemoveEntry={handleRemoveEntry}
-            handleAddEntry={handleAddEntry}
-            updateEntry={updateEntry}
-            validateAndSave={validateAndSave}
-            categories={categories}
-            accounts={accounts}
-        />
-      </div>
+      {canEdit && (
+          <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden mb-6">
+            <EntryForm 
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                entries={entries}
+                handleRemoveEntry={handleRemoveEntry}
+                handleAddEntry={handleAddEntry}
+                updateEntry={updateEntry}
+                validateAndSave={validateAndSave}
+                categories={categories}
+                accounts={accounts}
+            />
+          </div>
+      )}
 
       {/* History Feed List */}
       <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
@@ -750,18 +754,22 @@ const Transactions: React.FC<TransactionsProps> = ({
                         <div className="flex flex-col sm:flex-row gap-3">
                             {!selectedTransaction.isArchived ? (
                                 <>
-                                    <button 
-                                        onClick={handleStartEditDetail}
-                                        className="w-full sm:flex-1 flex items-center justify-center gap-2 px-6 py-5 bg-white border border-gray-200 text-gray-600 text-xs font-black uppercase tracking-[0.1em] rounded-2xl hover:bg-gray-50 transition-all shadow-sm"
-                                    >
-                                        <Edit2 size={16} /> Edit Record
-                                    </button>
-                                    <button 
-                                        onClick={() => handleArchive(selectedTransaction.id)}
-                                        className="w-full sm:flex-1 flex items-center justify-center gap-2 px-6 py-5 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-black uppercase tracking-[0.1em] rounded-2xl hover:bg-rose-100 hover:border-rose-200 transition-all shadow-sm"
-                                    >
-                                        <Archive size={16} /> Archive
-                                    </button>
+                                    {canEdit && (
+                                      <>
+                                        <button 
+                                            onClick={handleStartEditDetail}
+                                            className="w-full sm:flex-1 flex items-center justify-center gap-2 px-6 py-5 bg-white border border-gray-200 text-gray-600 text-xs font-black uppercase tracking-[0.1em] rounded-2xl hover:bg-gray-50 transition-all shadow-sm"
+                                        >
+                                            <Edit2 size={16} /> Edit Record
+                                        </button>
+                                        <button 
+                                            onClick={() => handleArchive(selectedTransaction.id)}
+                                            className="w-full sm:flex-1 flex items-center justify-center gap-2 px-6 py-5 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-black uppercase tracking-[0.1em] rounded-2xl hover:bg-rose-100 hover:border-rose-200 transition-all shadow-sm"
+                                        >
+                                            <Archive size={16} /> Archive
+                                        </button>
+                                      </>
+                                    )}
                                 </>
                             ) : (
                                 <div className="w-full p-5 bg-gray-900 rounded-[1.5rem] text-center">

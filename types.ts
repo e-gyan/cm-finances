@@ -42,6 +42,8 @@ export interface User {
   email: string;
   status: 'ACTIVE' | 'DISABLED';
   momoNumber?: string;
+  accessCode?: string;
+  permissions?: ('VIEW_OVERVIEW' | 'VIEW_TRANSACTIONS' | 'EDIT_TRANSACTIONS' | 'VIEW_REPORTS' | 'VIEW_SETTINGS')[];
 }
 
 export type Period = 'WEEK' | 'MONTH' | 'QUARTER' | 'YEAR';

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Category, User, Transaction, AccountType, TransactionType } from '../types';
 import { Trash2, Plus, RefreshCw, Archive, Search, FileText, Edit2, Check, X, AlertTriangle, Database, Download, Upload, Cloud, Lock, Key, Shield, UserPlus, Power, Eye, EyeOff, Smartphone, BookOpen, Map, Activity, GitMerge, Share2, Layers, ShieldCheck, LayoutTemplate, Lightbulb, Users, ArrowRight, MousePointerClick, Zap, Square, CheckSquare } from 'lucide-react';
-import { formatCurrency } from '../utils';
+import { formatCurrency, hashAccessCode } from '../utils';
 
 interface SettingsProps {
   transactions: Transaction[];
@@ -18,6 +18,7 @@ interface SettingsProps {
   cloudConfig: { binId: string; apiKey: string };
   onUpdateCloudConfig: (binId: string, apiKey: string) => void;
   onUserAction: (action: 'ADD' | 'UPDATE' | 'DELETE', user: User) => void;
+  currentUser: User | null;
 }
 
 const ADMIN_PIN = '1234';
@@ -36,7 +37,8 @@ const Settings: React.FC<SettingsProps> = ({
   onImportData,
   cloudConfig,
   onUpdateCloudConfig,
-  onUserAction
+  onUserAction,
+  currentUser
 }) => {
   const [activeSection, setActiveSection] = useState<'CATEGORIES' | 'USERS' | 'ARCHIVE' | 'CLOUD' | 'DOCS' | 'PORTFOLIO'>('CATEGORIES');
   const [newCatName, setNewCatName] = useState('');
@@ -62,7 +64,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [isUserEditing, setIsUserEditing] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userForm, setUserForm] = useState<Partial<User>>({
-      name: '', email: '', phone: '', role: 'VIEWER', status: 'ACTIVE', momoNumber: ''
+      name: '', email: '', phone: '', role: 'VIEWER', status: 'ACTIVE', momoNumber: '', accessCode: '', permissions: []
   });
 
   // Category Editing state
@@ -198,21 +200,30 @@ const Settings: React.FC<SettingsProps> = ({
     
     if (user) {
         setSelectedUser(user);
-        setUserForm(user);
+        setUserForm({ ...user, accessCode: '' });
     } else {
         setSelectedUser(null);
-        setUserForm({ name: '', email: '', phone: '', role: 'VIEWER', status: 'ACTIVE', momoNumber: '' });
+        setUserForm({ name: '', email: '', phone: '', role: 'VIEWER', status: 'ACTIVE', momoNumber: '', accessCode: '', permissions: [] });
     }
     setIsUserEditing(true);
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
       if (!userForm.name || !userForm.role) return;
       
+      const userToSave = { ...userForm };
+      
+      if (userForm.accessCode) {
+          userToSave.accessCode = await hashAccessCode(userForm.accessCode);
+      } else if (selectedUser) {
+          userToSave.accessCode = selectedUser.accessCode;
+      }
+      
       if (selectedUser) {
-          onUserAction('UPDATE', { ...selectedUser, ...userForm } as User);
+          onUserAction('UPDATE', { ...selectedUser, ...userToSave } as User);
       } else {
-          onUserAction('ADD', userForm as User);
+          // UUID generation handles id if not present, but let's give it one or let App.tsx handle
+          onUserAction('ADD', userToSave as User);
       }
       setIsUserEditing(false);
       setSelectedUser(null);
@@ -252,7 +263,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const navItems = [
       { id: 'CATEGORIES', label: 'Categories' },
-      { id: 'USERS', label: 'Users' },
+      ...(currentUser?.role === 'ADMIN' ? [{ id: 'USERS', label: 'Users' }] : []),
       { id: 'ARCHIVE', label: 'Archives' },
       { id: 'CLOUD', label: 'Cloud Sync' },
       { id: 'DOCS', label: 'System Manual' },
@@ -440,7 +451,45 @@ const Settings: React.FC<SettingsProps> = ({
                                      <option value="ADMIN">ADMINISTRATOR (Full Access)</option>
                                  </select>
                              </div>
+                             <div>
+                                 <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Login Access Code</label>
+                                 <input className="w-full p-4 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-primary/10 outline-none bg-white placeholder:text-gray-400 placeholder:text-[10px] placeholder:tracking-widest placeholder:uppercase" 
+                                    type="text" inputMode="numeric" pattern="[0-9]*"
+                                    value={userForm.accessCode || ''} onChange={e => setUserForm({...userForm, accessCode: e.target.value.replace(/\D/g, '')})} placeholder={selectedUser ? "Leave blank to keep existing" : "Provide access code"} />
+                             </div>
                          </div>
+                         
+                         {userForm.role !== 'ADMIN' && (
+                             <div className="mb-6 bg-white p-4 rounded-2xl border border-gray-100">
+                                 <label className="text-[10px] font-black text-gray-400 mb-4 block uppercase tracking-widest">App Component Permissions</label>
+                                 <div className="flex flex-wrap gap-3">
+                                     {[
+                                         { id: 'VIEW_OVERVIEW', label: 'Overview' },
+                                         { id: 'VIEW_TRANSACTIONS', label: 'Transactions (View)' },
+                                         { id: 'EDIT_TRANSACTIONS', label: 'Transactions (Edit)' },
+                                         { id: 'VIEW_REPORTS', label: 'Reports' },
+                                         { id: 'VIEW_SETTINGS', label: 'Settings' }
+                                     ].map(perm => (
+                                         <button 
+                                             key={perm.id}
+                                             onClick={() => {
+                                                 const perms = userForm.permissions || [];
+                                                 if (perms.includes(perm.id as any)) {
+                                                     setUserForm({...userForm, permissions: perms.filter(p => p !== perm.id as any)});
+                                                 } else {
+                                                     setUserForm({...userForm, permissions: [...perms, perm.id as any]});
+                                                 }
+                                             }}
+                                             className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border ${userForm.permissions?.includes(perm.id as any) ? 'bg-primary/10 text-primary border-primary/20' : 'bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100'}`}
+                                         >
+                                             {userForm.permissions?.includes(perm.id as any) && <Check size={12} className="inline mr-1" />}
+                                             {perm.label}
+                                         </button>
+                                     ))}
+                                 </div>
+                             </div>
+                         )}
+
                          <div className="flex justify-end gap-3 mt-4">
                              <button onClick={() => setIsUserEditing(false)} className="px-6 py-3 rounded-2xl bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Cancel</button>
                              <button onClick={handleSaveUser} className="px-6 py-3 rounded-2xl bg-primary text-white font-bold hover:bg-teal-800 shadow-lg">Save User</button>
