@@ -28,6 +28,22 @@
           -ms-overflow-style: none;  /* IE and Edge */
           scrollbar-width: none;  /* Firefox */
       }
+      /* Safe area insets for mobile */
+      .pb-safe {
+          padding-bottom: env(safe-area-inset-bottom);
+      }
+      .pt-safe {
+          padding-top: env(safe-area-inset-top);
+      }
+      /* Hide number input spinners for mobile cleanliness */
+      input[type=number]::-webkit-inner-spin-button, 
+      input[type=number]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+      }
+      input[type=number] {
+          -moz-appearance: textfield;
+      }
     </style>
   <script type="importmap">
 {

@@ -169,11 +169,23 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
             }
         });
     } else if (activeTab === 'QUARTERLY') {
-        [1, 2, 3, 4].forEach(q => chartData.push({ name: `Q${q}`, income: 0, expense: 0, sortOrder: q }));
-        filtered.forEach(t => {
+        filtered = filtered.filter(t => {
             const month = new Date(t.date).getMonth();
             const q = Math.floor(month / 3) + 1;
-            const entry = chartData.find(c => c.name === `Q${q}`);
+            return q === selectedQuarter;
+        });
+        
+        const startMonth = (selectedQuarter - 1) * 3;
+        for (let i = 0; i < 3; i++) {
+            const m = startMonth + i;
+            const monthName = new Date(2000, m, 1).toLocaleString('default', { month: 'short' });
+            chartData.push({ name: monthName, income: 0, expense: 0, sortOrder: i });
+        }
+        
+        filtered.forEach(t => {
+            const month = new Date(t.date).getMonth();
+            const monthName = new Date(2000, month, 1).toLocaleString('default', { month: 'short' });
+            const entry = chartData.find(c => c.name === monthName);
             if (entry) {
                  if (t.type === TransactionType.INCOME) entry.income += t.amount;
                  if (t.type === TransactionType.EXPENSE) entry.expense += t.amount;
@@ -203,12 +215,29 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
         return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 3);
     };
 
+    const getTopItems = (type: TransactionType) => {
+        const map: Record<string, number> = {};
+        filtered.filter(t => t.type === type).forEach(t => {
+            if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
+                t.meta.breakdown.forEach((b: any) => {
+                    const name = b.item || 'Unknown Item';
+                    map[name] = (map[name] || 0) + Number(b.amount || 0);
+                });
+            } else {
+                const name = t.notes || t.category || 'Expense';
+                map[name] = (map[name] || 0) + t.amount;
+            }
+        });
+        return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 3);
+    };
+
     return {
         chartData, totalIncome, totalExpense, net: totalIncome - totalExpense,
         topIncome: getTopCategories(TransactionType.INCOME), topExpense: getTopCategories(TransactionType.EXPENSE),
+        topItems: getTopItems(TransactionType.EXPENSE),
         isEmpty: filtered.length === 0
     };
-  }, [transactions, activeTab, selectedYear, selectedMonth]);
+  }, [transactions, activeTab, selectedYear, selectedMonth, selectedQuarter]);
 
 
   // --- Handlers ---
@@ -238,12 +267,18 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
           const historyContext = filteredTransactions
             .slice(0, 20)
-            .map(t => `${t.notes || 'Expense'}: ${t.amount} GHS`)
+            .flatMap(t => {
+                if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
+                    return t.meta.breakdown.map((b: any) => `${b.item}: ${b.amount}`);
+                }
+                return [`${t.notes || t.category || 'Expense'}: ${t.amount}`];
+            })
+            .slice(0, 15)
             .join('\n');
 
           const response = await ai.models.generateContent({
              model: "gemini-3-flash-preview",
-             contents: `Based on these recent expense records, suggest 3-4 likely items for this week's plan. Return JSON array. History: ${historyContext}`,
+             contents: `Extract the EXACT items and their literal prices from the history below. Return up to 5 exact items actually spent. DO NOT invent new generalized items. Return a JSON array. History: ${historyContext}`,
              config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { item: { type: Type.STRING }, cost: { type: Type.STRING } } } } }
           });
           
@@ -357,7 +392,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       if (weeklyExpenses.length > 0) {
           weeklyExpenses.forEach(t => {
               if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
-                  t.meta.breakdown.forEach((item: {item: string, amount: number}) => text += `- ${item.item}: ${formatCurrency(item.amount)} (${t.accountId})\n`);
+                  t.meta.breakdown.forEach((item: {item: string, amount: number}) => text += `- ${item.item}: ${formatCurrency(item.amount)}\n`);
               } else {
                   text += `- ${t.notes || t.category}: ${formatCurrency(t.amount)}\n`;
               }
@@ -373,18 +408,13 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     } else if (activeTab === 'QUARTERLY') {
         const qName = `Q${selectedQuarter}`;
         const qRange = getQuarterRangeName(selectedQuarter);
-        const qData = analyticalData.chartData.find(d => d.name === qName);
         
         text += `*Quarterly Report: ${qName}*\n`;
         text += `Period: ${qRange} ${selectedYear}\n\n`;
         
-        if (qData) {
-            text += `Income: ${formatCurrency(qData.income)}\n`;
-            text += `Expense: ${formatCurrency(qData.expense)}\n`;
-            text += `*Net: ${formatCurrency(qData.income - qData.expense)}*\n`;
-        } else {
-            text += `No data available for ${qName}.\n`;
-        }
+        text += `Income: ${formatCurrency(analyticalData.totalIncome)}\n`;
+        text += `Expense: ${formatCurrency(analyticalData.totalExpense)}\n`;
+        text += `*Net: ${formatCurrency(analyticalData.net)}*\n`;
 
     } else {
       text += `*Period:* ${selectedYear} ${activeTab === 'MONTHLY' ? getMonthName(selectedMonth) : ''}\n\n`;
@@ -401,7 +431,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
         {/* Tab Navigation */}
         <div className="flex flex-wrap border-b border-gray-100 bg-gray-50/50">
           {(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'] as ReportType[]).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 min-w-[25%] py-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${activeTab === tab ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 min-w-[50%] sm:min-w-[25%] px-4 py-4 md:py-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${activeTab === tab ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
               {tab}
               {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-t-full mx-4 sm:mx-8 animate-in slide-in-from-bottom-2 duration-300" />}
             </button>
@@ -471,8 +501,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                 </div>
               )}
               
-              <button onClick={handleShareClick} className="flex items-center justify-center px-6 py-4 bg-[#25D366] text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-[#128C7E] transition-all shadow-xl whitespace-nowrap active:scale-95">
-                <MessageCircle size={18} className="mr-2" /> Share on WhatsApp
+              <button onClick={handleShareClick} className="flex items-center justify-center px-6 py-4 bg-[#25D366] text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-[#128C7E] transition-all shadow-xl whitespace-nowrap active:scale-95 w-full lg:w-auto">
+                <MessageCircle size={18} className="mr-2" /> <span className="hidden sm:inline">Share on WhatsApp</span><span className="sm:hidden">Share</span>
               </button>
             </div>
           </div>
@@ -530,7 +560,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
 
                 {/* Expenses Input Card */}
                 <div className="bg-white border-2 border-primary/5 rounded-[2rem] shadow-sm p-6 relative">
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                       <div className="flex items-center gap-3">
                           <div className="p-2.5 bg-primary/5 rounded-xl text-primary"><PieChart size={20}/></div>
                           <div>
@@ -548,32 +578,34 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                              </div>
                           </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start bg-violet-50/50 sm:bg-transparent p-2 sm:p-0 rounded-2xl sm:rounded-none">
                           <select 
                               value={smartPlanRange}
                               onChange={(e) => setSmartPlanRange(e.target.value as any)}
-                              className="text-[9px] font-black uppercase tracking-widest bg-violet-50 rounded-lg px-2 py-1.5 outline-none cursor-pointer border-none text-violet-700 hover:bg-violet-100"
+                              className="text-[9px] font-black uppercase tracking-widest bg-violet-50 rounded-lg px-2 py-2 sm:py-1.5 outline-none cursor-pointer border-none text-violet-700 hover:bg-violet-100 flex-1 sm:flex-none"
                               title="Smart Plan History Range"
                           >
                               <option value="ALL">All History</option>
                               <option value="1_MONTH">Past Month</option>
                               <option value="2_WEEKS">Past 2 Weeks</option>
                           </select>
-                          <button onClick={handleAutoPlan} disabled={isAutoPlanning} className="flex items-center gap-2 px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-violet-200 transition-colors disabled:opacity-50">
-                             {isAutoPlanning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}{isAutoPlanning ? 'Thinking...' : 'Smart Plan'}
+                          <button onClick={handleAutoPlan} disabled={isAutoPlanning} className="flex items-center justify-center gap-2 px-4 py-2 sm:px-3 sm:py-1.5 bg-violet-100 text-violet-700 rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-violet-200 transition-colors disabled:opacity-50">
+                             {isAutoPlanning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}<span className="whitespace-nowrap">{isAutoPlanning ? 'Thinking...' : 'Smart Plan'}</span>
                           </button>
                       </div>
                   </div>
 
                   <div className="space-y-4">
                     {planInput.map((entry, idx) => (
-                      <div key={idx} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex gap-2 items-center">
-                        <input type="text" placeholder="Item Description" className="flex-1 min-w-0 p-2 bg-white rounded-xl border border-gray-100 text-xs font-bold outline-none" value={entry.item} onChange={(e) => { const n = [...planInput]; n[idx].item = e.target.value; setPlanInput(n); }} />
-                        <div className="flex gap-2 items-center shrink-0">
-                            <span className="text-gray-400 text-xs font-bold pl-1 hidden sm:inline">GHS</span>
-                            <input type="number" placeholder="0.00" className="w-20 sm:w-24 p-2 bg-transparent text-sm font-bold outline-none" value={entry.cost} onChange={(e) => { const n = [...planInput]; n[idx].cost = e.target.value; setPlanInput(n); }} />
+                      <div key={idx} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                        <input type="text" placeholder="Item Description" className="w-full sm:flex-1 p-2 bg-white rounded-xl border border-gray-100 text-xs font-bold outline-none" value={entry.item} onChange={(e) => { const n = [...planInput]; n[idx].item = e.target.value; setPlanInput(n); }} />
+                        <div className="flex items-center justify-between w-full sm:w-auto shrink-0">
+                            <span className="text-gray-400 text-xs font-bold pl-1 hidden sm:inline mr-2">GHS</span>
+                            <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                                <input type="number" placeholder="0.00" className="w-full sm:w-24 p-2 bg-white sm:bg-transparent rounded-xl sm:rounded-none border-gray-100 sm:border-none border text-sm font-bold outline-none" value={entry.cost} onChange={(e) => { const n = [...planInput]; n[idx].cost = e.target.value; setPlanInput(n); }} />
+                                {planInput.length > 1 && <button onClick={() => handleRemovePlanInput(idx)} className="p-2 text-rose-400 bg-rose-50 rounded-xl sm:bg-transparent sm:rounded-none hover:text-rose-600 shrink-0"><Trash2 size={16} /></button>}
+                            </div>
                         </div>
-                        {planInput.length > 1 && <button onClick={() => handleRemovePlanInput(idx)} className="p-2 text-rose-400 hover:text-rose-600 shrink-0"><Trash2 size={16} /></button>}
                       </div>
                     ))}
                     <button onClick={handleAddPlanInput} className="w-full py-3 bg-primary/5 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/10 transition-colors">+ Add Item</button>
@@ -629,6 +661,39 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                             <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100">
+                                <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-50 pb-4">Top 3 Expense Items</h4>
+                                <div className="space-y-4">
+                                    {analyticalData.topItems.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between items-center group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center font-bold text-xs">{idx + 1}</div>
+                                                <span className="font-bold text-gray-700">{item.name}</span>
+                                            </div>
+                                            <span className="font-black text-gray-900 group-hover:text-rose-500 transition-colors">{formatCurrency(item.value)}</span>
+                                        </div>
+                                    ))}
+                                    {analyticalData.topItems.length === 0 && <div className="text-gray-400 text-sm font-bold text-center py-4">No specific items found</div>}
+                                </div>
+                             </div>
+                             <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100">
+                                <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-50 pb-4">Top 3 Categories</h4>
+                                <div className="space-y-4">
+                                    {analyticalData.topExpense.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between items-center group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-violet-50 text-violet-500 flex items-center justify-center font-bold text-xs">{idx + 1}</div>
+                                                <span className="font-bold text-gray-700">{item.name}</span>
+                                            </div>
+                                            <span className="font-black text-gray-900 group-hover:text-violet-500 transition-colors">{formatCurrency(item.value)}</span>
+                                        </div>
+                                    ))}
+                                    {analyticalData.topExpense.length === 0 && <div className="text-gray-400 text-sm font-bold text-center py-4">No categories found</div>}
+                                </div>
+                             </div>
                         </div>
                     </>
                 )}

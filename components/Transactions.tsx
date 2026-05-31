@@ -129,7 +129,7 @@ const EntryForm = ({
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 min-w-[33%] py-4 md:py-6 text-[10px] font-black tracking-widest transition-all outline-none relative uppercase ${
+              className={`w-[50%] sm:w-[33%] flex-grow sm:flex-grow-0 px-2 sm:px-4 py-4 md:py-6 text-[10px] font-black tracking-widest transition-all outline-none relative uppercase ${
                 activeTab === tab 
                   ? tab === 'INCOME' ? 'text-emerald-600' : tab === 'EXPENSE' ? 'text-rose-600' : 'text-blue-600'
                   : 'text-gray-400 hover:text-gray-600'
@@ -145,7 +145,7 @@ const EntryForm = ({
           ))}
         </div>
 
-        <div className="p-4 md:p-10 max-h-[75vh] md:max-h-none overflow-y-auto">
+        <div className="p-4 md:p-10">
           <div className="space-y-6">
             {entries.map((entry: any, index: number) => (
               <div key={index} className="relative p-5 md:p-8 bg-gray-50/50 rounded-3xl border border-gray-200 space-y-4 md:space-y-6 shadow-inner group transition-all hover:bg-white hover:shadow-lg">
@@ -155,14 +155,14 @@ const EntryForm = ({
                     </button>
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                   <div>
                     <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Entry Date</label>
                     <input 
                         type="date" 
                         value={entry.date}
                         onChange={(e) => updateEntry(index, 'date', e.target.value)}
-                        className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none"
+                        className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-4 border text-sm font-bold outline-none bg-white"
                     />
                   </div>
                   <div>
@@ -172,16 +172,16 @@ const EntryForm = ({
                         placeholder="0.00"
                         value={entry.amount}
                         onChange={(e) => updateEntry(index, 'amount', e.target.value)}
-                        className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none transition-shadow duration-200"
+                        className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-4 border text-sm font-bold outline-none transition-shadow duration-200 bg-white"
                     />
                   </div>
                   
-                  <div className="md:col-span-2">
+                  <div className="sm:col-span-2">
                       <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Classification</label>
                       <select 
                           value={entry.category}
                           onChange={(e) => updateEntry(index, 'category', e.target.value)}
-                          className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
+                          className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-4 border text-sm font-bold outline-none bg-white cursor-pointer"
                       >
                           <option value="">Select Category...</option>
                           {categories
@@ -199,13 +199,13 @@ const EntryForm = ({
                                 <select 
                                     value={entry.accountId}
                                     onChange={(e) => updateEntry(index, 'accountId', e.target.value)}
-                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-4 border text-sm font-bold outline-none bg-white cursor-pointer"
                                 >
                                     <option value="">Select Account...</option>
                                     {accounts.map((a: string) => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
                                 </select>
                            </div>
-                           <div className="relative">
+                           <div className="relative mt-2 md:mt-0">
                                 <div className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-1 border border-blue-100 text-blue-400 shadow-sm">
                                     <ArrowRight size={16} />
                                 </div>
@@ -213,7 +213,7 @@ const EntryForm = ({
                                 <select 
                                     value={entry.toAccountId}
                                     onChange={(e) => updateEntry(index, 'toAccountId', e.target.value)}
-                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-4 border text-sm font-bold outline-none bg-white cursor-pointer"
                                 >
                                     <option value="">Select Account...</option>
                                     {accounts.map((a: string) => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
@@ -226,7 +226,7 @@ const EntryForm = ({
                                     placeholder="Reason for transfer..."
                                     value={entry.notes}
                                     onChange={(e) => updateEntry(index, 'notes', e.target.value)}
-                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-3.5 border text-sm font-bold outline-none bg-white"
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 p-4 border text-sm font-bold outline-none bg-white"
                                 />
                            </div>
                        </div>
@@ -237,7 +237,7 @@ const EntryForm = ({
                                 <select 
                                     value={entry.accountId}
                                     onChange={(e) => updateEntry(index, 'accountId', e.target.value)}
-                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none bg-white cursor-pointer"
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-4 border text-sm font-bold outline-none bg-white cursor-pointer"
                                 >
                                     <option value="">Select Account...</option>
                                     {accounts.map((a: string) => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
@@ -249,7 +249,7 @@ const EntryForm = ({
                                     placeholder="Enter description or recipient details..."
                                     value={entry.notes}
                                     onChange={(e) => updateEntry(index, 'notes', e.target.value)}
-                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-3.5 border text-sm font-bold outline-none transition-shadow duration-200"
+                                    className="w-full rounded-2xl border-gray-100 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary p-4 border text-sm font-bold outline-none transition-shadow duration-200"
                                     rows={1}
                                 />
                            </div>
@@ -309,8 +309,7 @@ const Transactions: React.FC<TransactionsProps> = ({
   const [itemsPerPage, setItemsPerPage] = useState<number>(25);
   
   // Mobile specific states
-  const [showFilters, setShowFilters] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false); 
+  const [showFilters, setShowFilters] = useState(false); 
   
   // Edit Mode State (Detail Modal)
   const [isEditingDetail, setIsEditingDetail] = useState(false);
@@ -473,7 +472,7 @@ const Transactions: React.FC<TransactionsProps> = ({
   return (
     <div className="space-y-6">
       {/* Desktop Entry Form Card - Hidden on Mobile */}
-      <div className="hidden md:block bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden mb-6">
         <EntryForm 
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -505,15 +504,15 @@ const Transactions: React.FC<TransactionsProps> = ({
                 </div>
                 
                 {/* Search & Actions */}
-                <div className="flex flex-col md:flex-row gap-2 w-full xl:w-auto">
+                <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
                     <button
                         onClick={exportToExcel}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-100 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm"
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-100 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm w-full sm:w-auto"
                         title="Export to Excel"
                     >
-                        <Download size={16} /> <span className="hidden xl:inline">Export</span>
+                        <Download size={16} /> <span>Export</span>
                     </button>
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 w-full">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input 
                             type="text" 
@@ -523,16 +522,16 @@ const Transactions: React.FC<TransactionsProps> = ({
                             className="pl-12 pr-6 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 w-full shadow-sm"
                         />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full sm:w-auto">
                         <button
                             onClick={() => setShowArchived(!showArchived)}
-                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all shadow-sm ${
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all shadow-sm ${
                                 showArchived ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
                             }`}
                         >
                             {showArchived ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
-                         <div className="relative h-[42px] md:h-auto min-w-[80px]">
+                         <div className="relative h-[42px] md:h-auto flex-1 sm:min-w-[80px]">
                             <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                             <select 
                                 value={itemsPerPage}
@@ -551,12 +550,12 @@ const Transactions: React.FC<TransactionsProps> = ({
             {/* Filter Chips - Toggleable */}
             <div className={`flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300 ${showFilters ? 'flex' : 'hidden md:flex'}`}>
                 <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Type:</span>
+                    <div className="w-full sm:w-auto"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Type:</span></div>
                     {[TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER].map(type => (
                         <button
                             key={type}
                             onClick={() => toggleTypeFilter(type)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
                                 selectedTypes.includes(type)
                                 ? 'bg-gray-900 text-white border-gray-900 shadow-md'
                                 : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
@@ -565,16 +564,16 @@ const Transactions: React.FC<TransactionsProps> = ({
                             {type}
                         </button>
                     ))}
-                    {selectedTypes.length > 0 && <button onClick={() => setSelectedTypes([])} className="text-[10px] text-gray-400 hover:text-rose-500 px-2">Clear</button>}
+                    {selectedTypes.length > 0 && <button onClick={() => setSelectedTypes([])} className="text-[10px] text-gray-400 hover:text-rose-500 px-2 w-full sm:w-auto text-left sm:text-center mt-1 sm:mt-0">Clear</button>}
                 </div>
 
                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Account:</span>
+                    <div className="w-full sm:w-auto"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Account:</span></div>
                     {accounts.map(acc => (
                         <button
                             key={acc}
                             onClick={() => toggleAccountFilter(acc)}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
                                 selectedAccounts.includes(acc)
                                 ? 'bg-gray-900 text-white border-gray-900 shadow-md'
                                 : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
@@ -583,7 +582,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                             {SHORT_ACCOUNT_LABELS[acc] || acc}
                         </button>
                     ))}
-                     {selectedAccounts.length > 0 && <button onClick={() => setSelectedAccounts([])} className="text-[10px] text-gray-400 hover:text-rose-500 px-2">Clear</button>}
+                     {selectedAccounts.length > 0 && <button onClick={() => setSelectedAccounts([])} className="text-[10px] text-gray-400 hover:text-rose-500 px-2 w-full sm:w-auto text-left sm:text-center mt-1 sm:mt-0">Clear</button>}
                 </div>
             </div>
 
@@ -596,39 +595,6 @@ const Transactions: React.FC<TransactionsProps> = ({
             showArchived={showArchived} 
         />
       </div>
-
-      {/* Mobile Floating Action Button */}
-      <button 
-        onClick={() => setIsFormOpen(true)}
-        className="md:hidden fixed bottom-24 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center z-50 active:scale-90 transition-transform"
-      >
-        <Plus size={28} />
-      </button>
-
-      {/* Mobile Form Modal */}
-      {isFormOpen && (
-          <div className="fixed inset-0 z-[100] bg-white animate-in slide-in-from-bottom duration-300 flex flex-col">
-              <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                  <h3 className="font-black text-xl text-gray-900 tracking-tight">New Entry</h3>
-                  <button onClick={() => setIsFormOpen(false)} className="p-2 bg-gray-100 rounded-full text-gray-500">
-                      <X size={24} />
-                  </button>
-              </div>
-              <div className="flex-1 overflow-y-auto bg-gray-50 pb-safe">
-                   <EntryForm 
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        entries={entries}
-                        handleRemoveEntry={handleRemoveEntry}
-                        handleAddEntry={handleAddEntry}
-                        updateEntry={updateEntry}
-                        validateAndSave={validateAndSave}
-                        categories={categories}
-                        accounts={accounts}
-                   />
-              </div>
-          </div>
-      )}
 
       {/* Detail Modal */}
       {selectedTransaction && (
@@ -776,23 +742,23 @@ const Transactions: React.FC<TransactionsProps> = ({
 
                   <div className="p-6 md:p-10 border-t border-gray-50 bg-gray-50/50 shrink-0">
                       {isEditingDetail ? (
-                          <div className="flex gap-3">
-                              <button onClick={() => setIsEditingDetail(false)} className="flex-1 py-4 bg-gray-200 text-gray-600 rounded-2xl font-bold uppercase text-xs tracking-widest">Cancel</button>
-                              <button onClick={handleSaveEditDetail} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg shadow-emerald-600/20">Save Changes</button>
+                          <div className="flex flex-col sm:flex-row gap-3">
+                              <button onClick={() => setIsEditingDetail(false)} className="w-full sm:flex-1 py-4 bg-gray-200 text-gray-600 rounded-2xl font-bold uppercase text-xs tracking-widest">Cancel</button>
+                              <button onClick={handleSaveEditDetail} className="w-full sm:flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg shadow-emerald-600/20">Save Changes</button>
                           </div>
                       ) : (
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
                             {!selectedTransaction.isArchived ? (
                                 <>
                                     <button 
                                         onClick={handleStartEditDetail}
-                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-5 bg-white border border-gray-200 text-gray-600 text-xs font-black uppercase tracking-[0.1em] rounded-2xl hover:bg-gray-50 transition-all shadow-sm"
+                                        className="w-full sm:flex-1 flex items-center justify-center gap-2 px-6 py-5 bg-white border border-gray-200 text-gray-600 text-xs font-black uppercase tracking-[0.1em] rounded-2xl hover:bg-gray-50 transition-all shadow-sm"
                                     >
                                         <Edit2 size={16} /> Edit Record
                                     </button>
                                     <button 
                                         onClick={() => handleArchive(selectedTransaction.id)}
-                                        className="flex-1 flex items-center justify-center gap-2 px-6 py-5 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-black uppercase tracking-[0.1em] rounded-2xl hover:bg-rose-100 hover:border-rose-200 transition-all shadow-sm"
+                                        className="w-full sm:flex-1 flex items-center justify-center gap-2 px-6 py-5 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-black uppercase tracking-[0.1em] rounded-2xl hover:bg-rose-100 hover:border-rose-200 transition-all shadow-sm"
                                     >
                                         <Archive size={16} /> Archive
                                     </button>
