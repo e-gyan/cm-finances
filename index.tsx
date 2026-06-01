@@ -9,7 +9,7 @@ import App from './App';
   env: {
     // ⚠️ SECURITY WARNING: You posted this key in a public chat. 
     // Please revoke it in Google AI Studio and generate a new one for production.
-    API_KEY: "AIzaSyCEdiDjD0EZ2Ke3hKAWETU5WOWjNWFH-Kw" 
+    API_KEY: "" 
   }
 };
 

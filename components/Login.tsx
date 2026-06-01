@@ -19,7 +19,7 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
     setError('');
 
     if (!accessCode.trim()) {
-      setError('Please enter your access code.');
+      setError('Please enter a numerical access code.');
       return;
     }
 
@@ -81,7 +81,7 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
         </form>
 
         <p className="text-[10px] text-gray-300 font-bold mt-8 uppercase tracking-widest text-center leading-relaxed">
-           For authorized teachers only.<br />Contact Admin for access.
+           For authorized personnel only.<br />Contact IT for access.
         </p>
       </div>
     </div>
