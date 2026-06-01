@@ -496,37 +496,50 @@ const Settings: React.FC<SettingsProps> = ({
                          </div>
                      </div>
                  ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {users.map(user => (
-                            <div key={user.id} className={`p-6 border rounded-[2rem] flex items-center justify-between shadow-sm transition-all ${user.status === 'DISABLED' ? 'bg-gray-100 border-gray-200 opacity-75' : 'bg-white border-gray-100'}`}>
-                                <div className="flex items-center gap-4">
-                                    <div className={`h-14 w-14 rounded-2xl flex items-center justify-center font-black text-xl ${user.status === 'DISABLED' ? 'bg-gray-200 text-gray-400' : 'bg-primary/10 text-primary'}`}>
-                                        {user.name.charAt(0)}
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-gray-900 tracking-tight flex items-center gap-2">
-                                            {user.name} 
-                                            {user.status === 'DISABLED' && <span className="text-[8px] bg-gray-200 text-gray-500 px-2 py-0.5 rounded-md uppercase tracking-widest">Disabled</span>}
-                                        </p>
-                                        <p className="text-xs text-gray-500 font-medium">{user.email}</p>
-                                        <div className="flex gap-2 mt-1">
-                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{user.role}</p>
-                                            {user.momoNumber && <span className="flex items-center gap-1 text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold"><Smartphone size={10} /> {user.momoNumber}</span>}
+                            <div key={user.id} className={`p-5 rounded-[2rem] border flex flex-col justify-between shadow-sm transition-all ${user.status === 'DISABLED' ? 'bg-gray-50 border-gray-100 opacity-60 grayscale-[0.5]' : 'bg-white border-gray-100 hover:shadow-md hover:border-gray-200'}`}>
+                                <div>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-inner ${user.status === 'DISABLED' ? 'bg-gray-200 text-gray-500' : 'bg-primary/10 text-primary'}`}>
+                                            {user.name.charAt(0)}
+                                        </div>
+                                        <div className="flex bg-gray-50 rounded-xl p-1 shadow-inner border border-gray-100">
+                                            <button onClick={() => handleOpenUserForm(user)} className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-gray-400 hover:text-gray-900 transition-all">
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button 
+                                                onClick={() => onUserAction(user.status === 'ACTIVE' ? 'DELETE' : 'UPDATE', { ...user, status: user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE' })}
+                                                className={`p-2 rounded-lg transition-all ${user.status === 'ACTIVE' ? 'hover:bg-white hover:shadow-sm hover:text-rose-500 text-gray-400' : 'bg-white shadow-sm text-emerald-500'}`}
+                                                title={user.status === 'ACTIVE' ? "Disable User" : "Enable User"}
+                                            >
+                                                {user.status === 'ACTIVE' ? <Trash2 size={16} /> : <Check size={16} />}
+                                            </button>
                                         </div>
                                     </div>
+                                    <div className="mb-2">
+                                        <p className="font-black text-xl text-gray-900 tracking-tight flex items-center gap-2 mb-1">
+                                            {user.name} 
+                                        </p>
+                                        <p className="text-xs text-gray-500 font-medium line-clamp-1">{user.email}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 mt-4">
+                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
+                                            user.role === 'ADMIN' ? 'bg-blue-50 text-blue-600' :
+                                            user.role === 'FINANCE_REP' ? 'bg-amber-50 text-amber-600' :
+                                            'bg-gray-100 text-gray-500'
+                                        }`}>
+                                            {user.role}
+                                        </span>
+                                        {user.status === 'DISABLED' && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 bg-gray-200 text-gray-500 rounded-md">Disabled</span>}
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => handleOpenUserForm(user)} className="p-3 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-gray-900 transition-colors">
-                                        <Edit2 size={18} />
-                                    </button>
-                                    <button 
-                                        onClick={() => onUserAction(user.status === 'ACTIVE' ? 'DELETE' : 'UPDATE', { ...user, status: user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE' })}
-                                        className={`p-3 rounded-xl transition-colors ${user.status === 'ACTIVE' ? 'hover:bg-rose-50 text-gray-400 hover:text-rose-500' : 'hover:bg-emerald-50 text-gray-400 hover:text-emerald-500'}`}
-                                        title={user.status === 'ACTIVE' ? "Disable User" : "Enable User"}
-                                    >
-                                        {user.status === 'ACTIVE' ? <Trash2 size={18} /> : <Check size={18} />}
-                                    </button>
-                                </div>
+                                {user.momoNumber && (
+                                    <div className="mt-5 pt-4 border-t border-gray-50 flex items-center gap-2 text-gray-500">
+                                        <Smartphone size={14} className="text-emerald-500" />
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">{user.momoNumber}</span>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>

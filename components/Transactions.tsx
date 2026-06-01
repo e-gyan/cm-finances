@@ -43,22 +43,22 @@ const HistoryList = React.memo(({
             <div 
                 key={t.id} 
                 onClick={() => onSelect(t)}
-                className={`p-4 md:px-8 md:py-5 flex items-start gap-3 md:gap-6 transition-all cursor-pointer hover:bg-gray-50 active:scale-[0.99] group ${t.isArchived ? 'opacity-60 bg-gray-50/50 grayscale-[0.5]' : ''}`}
+                className={`p-3 md:px-8 md:py-5 flex items-start gap-3 md:gap-6 transition-all cursor-pointer hover:bg-gray-50 active:bg-gray-100 group ${t.isArchived ? 'opacity-60 bg-gray-50/50 grayscale-[0.5]' : ''}`}
             >
                 {/* Date Box - Compact */}
-                <div className={`shrink-0 flex flex-col items-center justify-center w-12 h-12 md:w-14 md:h-14 rounded-2xl border border-gray-100 ${t.isArchived ? 'bg-gray-200' : 'bg-white shadow-sm'}`}>
-                    <span className="text-[9px] font-black text-gray-400 uppercase leading-none">{new Date(t.date).toLocaleString('default', { month: 'short' }).toUpperCase()}</span>
-                    <span className="text-lg md:text-xl font-black text-gray-900 leading-none mt-0.5">{new Date(t.date).getDate()}</span>
+                <div className={`shrink-0 flex flex-col items-center justify-center w-11 h-11 md:w-14 md:h-14 rounded-[0.8rem] md:rounded-2xl border border-gray-100 ${t.isArchived ? 'bg-gray-200' : 'bg-white shadow-sm'}`}>
+                    <span className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase leading-none">{new Date(t.date).toLocaleString('default', { month: 'short' }).toUpperCase()}</span>
+                    <span className="text-base md:text-xl font-black text-gray-900 leading-none mt-0.5">{new Date(t.date).getDate()}</span>
                 </div>
 
                 {/* Content Area - Stacked for Mobile, Row for Desktop */}
                 <div className="flex-1 min-w-0 py-0.5">
                     {/* Top Row: Title & Amount */}
-                    <div className="flex justify-between items-start mb-1">
-                        <h4 className={`font-bold text-sm md:text-base truncate pr-2 ${t.isArchived ? 'text-gray-500' : 'text-gray-900'}`}>
+                    <div className="flex justify-between items-start mb-0.5 md:mb-1">
+                        <h4 className={`font-bold text-[13px] md:text-base truncate pr-2 leading-tight ${t.isArchived ? 'text-gray-500' : 'text-gray-900'}`}>
                             {t.category}
                         </h4>
-                        <span className={`text-sm md:text-lg font-black tracking-tight whitespace-nowrap ${
+                        <span className={`text-[13px] md:text-lg font-black tracking-tight whitespace-nowrap mt-[1px] md:mt-0 ${
                             t.isArchived ? 'text-gray-400' :
                             t.type === TransactionType.INCOME ? 'text-emerald-600' : 
                             t.type === TransactionType.EXPENSE ? 'text-rose-600' : 'text-blue-600'
@@ -68,9 +68,9 @@ const HistoryList = React.memo(({
                     </div>
 
                     {/* Bottom Row: Metadata Tags */}
-                    <div className="flex flex-wrap items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
+                    <div className="flex flex-wrap items-center gap-1 md:gap-2 text-[9px] md:text-xs">
                         {/* Type Badge */}
-                        <span className={`px-1.5 py-0.5 rounded-md font-black uppercase tracking-wider ${
+                        <span className={`px-1.5 py-[2px] rounded font-black uppercase tracking-wider ${
                              t.type === TransactionType.INCOME ? 'bg-emerald-50 text-emerald-700' :
                              t.type === TransactionType.EXPENSE ? 'bg-rose-50 text-rose-700' : 'bg-blue-50 text-blue-700'
                         }`}>
@@ -78,7 +78,7 @@ const HistoryList = React.memo(({
                         </span>
 
                         {/* Account Badge */}
-                        <span className="px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 font-bold uppercase tracking-wider truncate max-w-[100px]">
+                        <span className="px-1.5 py-[2px] rounded bg-gray-100 text-gray-500 font-bold uppercase tracking-wider truncate max-w-[80px] md:max-w-[100px]">
                             {t.type === TransactionType.TRANSFER ? `${SHORT_ACCOUNT_LABELS[t.accountId] || t.accountId} → ${SHORT_ACCOUNT_LABELS[t.toAccountId!] || t.toAccountId}` : (SHORT_ACCOUNT_LABELS[t.accountId] || t.accountId)}
                         </span>
 
@@ -506,32 +506,32 @@ const Transactions: React.FC<TransactionsProps> = ({
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 shrink-0">
-        <div className="bg-emerald-50 p-4 sm:p-6 rounded-[2rem] border border-emerald-100 flex items-center justify-between shadow-sm">
+      <div className="flex overflow-x-auto no-scrollbar gap-4 shrink-0 pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-3">
+        <div className="bg-emerald-50 p-4 sm:p-5 rounded-[2rem] border border-emerald-100 flex items-center gap-4 justify-between shadow-sm min-w-[200px] shrink-0">
           <div>
-            <p className="text-emerald-600 font-black text-[10px] uppercase tracking-widest">Filtered Income</p>
-            <p className="text-xl md:text-2xl font-black text-emerald-900 mt-1 tracking-tighter">{formatCurrency(totals.income)}</p>
+            <p className="text-emerald-600 font-black text-[9px] uppercase tracking-widest">Filtered Income</p>
+            <p className="text-lg md:text-xl font-black text-emerald-900 mt-0.5 tracking-tighter">{formatCurrency(totals.income)}</p>
           </div>
-          <div className="p-3 bg-white rounded-full text-emerald-600 shadow-sm hidden sm:block">
-            <TrendingUp size={20} />
+          <div className="p-2 sm:p-3 bg-white rounded-full text-emerald-600 shadow-sm shrink-0">
+            <TrendingUp size={18} />
           </div>
         </div>
-        <div className="bg-rose-50 p-4 sm:p-6 rounded-[2rem] border border-rose-100 flex items-center justify-between shadow-sm">
+        <div className="bg-rose-50 p-4 sm:p-5 rounded-[2rem] border border-rose-100 flex items-center gap-4 justify-between shadow-sm min-w-[200px] shrink-0">
           <div>
-            <p className="text-rose-600 font-black text-[10px] uppercase tracking-widest">Filtered Expenses</p>
-            <p className="text-xl md:text-2xl font-black text-rose-900 mt-1 tracking-tighter">{formatCurrency(totals.expense)}</p>
+            <p className="text-rose-600 font-black text-[9px] uppercase tracking-widest">Filtered Expenses</p>
+            <p className="text-lg md:text-xl font-black text-rose-900 mt-0.5 tracking-tighter">{formatCurrency(totals.expense)}</p>
           </div>
-          <div className="p-3 bg-white rounded-full text-rose-600 shadow-sm hidden sm:block">
-            <TrendingDown size={20} />
+          <div className="p-2 sm:p-3 bg-white rounded-full text-rose-600 shadow-sm shrink-0">
+            <TrendingDown size={18} />
           </div>
         </div>
-        <div className="bg-blue-50 p-4 sm:p-6 rounded-[2rem] border border-blue-100 flex items-center justify-between shadow-sm sm:col-span-2 lg:col-span-1">
+        <div className="bg-blue-50 p-4 sm:p-5 rounded-[2rem] border border-blue-100 flex items-center gap-4 justify-between shadow-sm min-w-[200px] shrink-0 md:col-span-1">
           <div>
-            <p className="text-blue-600 font-black text-[10px] uppercase tracking-widest">Net Filtered Balance</p>
-            <p className={`text-xl md:text-2xl font-black mt-1 tracking-tighter ${totals.income - totals.expense >= 0 ? "text-primary" : "text-rose-500"}`}>{formatCurrency(totals.income - totals.expense)}</p>
+            <p className="text-blue-600 font-black text-[9px] uppercase tracking-widest">Net Filtered Bal</p>
+            <p className={`text-lg md:text-xl font-black mt-0.5 tracking-tighter ${totals.income - totals.expense >= 0 ? "text-primary" : "text-rose-500"}`}>{formatCurrency(totals.income - totals.expense)}</p>
           </div>
-          <div className="p-3 bg-white rounded-full text-blue-600 shadow-sm hidden sm:block">
-            <Wallet size={20} />
+          <div className="p-2 sm:p-3 bg-white rounded-full text-blue-600 shadow-sm shrink-0">
+            <Wallet size={18} />
           </div>
         </div>
       </div>

@@ -405,13 +405,13 @@ function App() {
             </div>
          </div>
          <div className="flex items-center gap-3">
-             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border hidden sm:flex ${
+             <div className={`flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full transition-all border flex pointer-events-none ${
                 !binId ? 'bg-gray-50 border-gray-100 text-gray-400' :
                 isSyncing ? 'bg-blue-50 border-blue-100 text-blue-600' :
                 'bg-emerald-50 border-emerald-100 text-emerald-600'
              }`}>
-                {isSyncing ? <Loader2 size={14} className="animate-spin"/> : !binId ? <CloudOff size={14} /> : <Check size={14} strokeWidth={3} />}
-                <span className="text-[10px] font-black uppercase tracking-widest">
+                {isSyncing ? <Loader2 size={12} className="animate-spin"/> : !binId ? <CloudOff size={12} /> : <Check size={12} strokeWidth={3} />}
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider">
                   {isSyncing ? 'Syncing' : !binId ? 'Offline' : 'Synced'}
                 </span>
              </div>
