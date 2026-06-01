@@ -13,11 +13,17 @@ interface ReportsProps {
   users: User[];
   onAddTransaction: (t: Omit<Transaction, 'id'> | Omit<Transaction, 'id'>[]) => void;
   financeRep: User | undefined;
+  currentUser: User | null;
 }
 
 type ReportType = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 
-const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction, financeRep }) => {
+const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction, financeRep, currentUser }) => {
+  const isReportsOnlyUser = currentUser?.role !== 'ADMIN' && currentUser?.role !== 'FINANCE_REP' && 
+      !currentUser?.permissions?.includes('VIEW_TRANSACTIONS') && 
+      !currentUser?.permissions?.includes('EDIT_TRANSACTIONS') && 
+      !currentUser?.permissions?.includes('VIEW_OVERVIEW');
+
   const [activeTab, setActiveTab] = useState<ReportType>('WEEKLY');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -430,7 +436,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
         {/* Tab Navigation */}
         <div className="flex flex-wrap border-b border-gray-100 bg-gray-50/50">
-          {(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'] as ReportType[]).map(tab => (
+          {(isReportsOnlyUser ? ['WEEKLY'] : ['WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY'] as ReportType[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 min-w-[50%] sm:min-w-[25%] px-4 py-4 md:py-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${activeTab === tab ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
               {tab}
               {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-t-full mx-4 sm:mx-8 animate-in slide-in-from-bottom-2 duration-300" />}
@@ -511,7 +517,8 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
           {activeTab === 'WEEKLY' && (
             <div className="space-y-8 sm:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
               {/* Stats Grid - Adjusted to 2 columns */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <div className={`grid grid-cols-1 ${!isReportsOnlyUser ? 'md:grid-cols-2' : ''} gap-4 sm:gap-6`}>
+                {!isReportsOnlyUser && (
                 <div className="bg-emerald-50/50 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-3xl border border-emerald-100 relative overflow-hidden group">
                   <TrendingUp className="absolute -bottom-4 -right-4 text-emerald-200 opacity-20" size={120} />
                   <h4 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-6">Sunday Offerings</h4>
@@ -521,6 +528,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                     <div className="pt-2 flex justify-between items-center"><span className="text-sm font-black text-emerald-900">TOTAL INCOME</span><span className="text-2xl font-black text-emerald-950">{formatCurrency(weeklyStats.totalIncome)}</span></div>
                   </div>
                 </div>
+                )}
 
                 <div className="bg-rose-50/50 p-6 sm:p-8 rounded-[1.5rem] sm:rounded-3xl border border-rose-100 relative overflow-hidden group">
                   <TrendingDown className="absolute -bottom-4 -right-4 text-rose-200 opacity-20" size={120} />
@@ -534,8 +542,9 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
               </div>
 
               {/* Weekly Input Section */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+              <div className={`grid grid-cols-1 ${!isReportsOnlyUser ? 'lg:grid-cols-2' : ''} gap-6 sm:gap-8`}>
                 {/* Offerings Input Card */}
+                {!isReportsOnlyUser && (
                 <div className="bg-white border-2 border-emerald-50 rounded-[2rem] shadow-sm p-6">
                   <div className="flex items-center gap-3 mb-6"><div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600"><Plus size={20}/></div><h3 className="font-black text-emerald-900 uppercase tracking-widest text-xs">Offerings</h3></div>
                   <div className="space-y-4">
@@ -557,6 +566,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                     <button onClick={handleAddOfferingInput} className="w-full py-3 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-colors">+ Add Source</button>
                   </div>
                 </div>
+                )}
 
                 {/* Expenses Input Card */}
                 <div className="bg-white border-2 border-primary/5 rounded-[2rem] shadow-sm p-6 relative">

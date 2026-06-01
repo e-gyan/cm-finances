@@ -18,7 +18,7 @@ const loadState = <T,>(key: string, fallback: T): T => {
     try {
       return JSON.parse(saved);
     } catch (e) {
-      console.error('Failed to parse storage', e);
+      console.warn('Failed to parse storage', e);
       return fallback;
     }
   }
@@ -52,7 +52,7 @@ function App() {
         localStorage.setItem('THESAURUS_HASH_MIGRATED_V2', 'true');
         return loadedUsers.map(u => {
             if (u.id === 'u1') return { ...u, accessCode: '5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5' }; // 12345
-            if (u.id === 'u2') return { ...u, accessCode: '38ccf618bc32befde7649d21ce9a4918e938da641dedfc176efeb622a559eeb6' }; // Default finance
+            if (u.id === 'u2') return { ...u, accessCode: 'e2217d3e4e120c6a3372a1890f03e232b35ad659d71f7a62501a4ee204a3e66d' }; // 67890
             return u;
         });
     }
@@ -63,7 +63,7 @@ function App() {
             return { ...u, accessCode: '5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5' };
         }
         if (u.id === 'u2' && (!u.accessCode || u.accessCode.length !== 64)) {
-            return { ...u, accessCode: '38ccf618bc32befde7649d21ce9a4918e938da641dedfc176efeb622a559eeb6' };
+            return { ...u, accessCode: 'e2217d3e4e120c6a3372a1890f03e232b35ad659d71f7a62501a4ee204a3e66d' };
         }
         return u;
     });
@@ -107,7 +107,7 @@ function App() {
         }
         setLastSyncTime(new Date());
     } catch (error) {
-        console.error("Cloud Sync Failed", error);
+        console.warn("Cloud Sync Failed", error);
         // We only alert the user if they manually did a commit, but often we auto-save.
         // It's better to fail silently on auto-save or show a subtle UI indicator, but for now we'll keep the console log.
     } finally {
@@ -137,7 +137,7 @@ function App() {
           
           setLastSyncTime(new Date());
       } catch (error) {
-          console.error("Load Failed. The Cloud storage (JSONBin) might be rate-limited or the API key is invalid. Please check Settings > Cloud Sync.", error);
+          console.warn("Load Failed", error);
           // Don't alert on auto-load to avoid annoying user, just log
       } finally {
           setIsSyncing(false);
@@ -401,18 +401,23 @@ function App() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-black text-xs">TH</div>
             <div className="flex flex-col">
               <h1 className="text-sm font-black text-gray-900 leading-none tracking-tight uppercase">Thesaurus</h1>
-              <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Finance App</span>
+              <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{currentUser?.name}</span>
             </div>
          </div>
-         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${
-            !binId ? 'bg-gray-50 border-gray-100 text-gray-400' :
-            isSyncing ? 'bg-blue-50 border-blue-100 text-blue-600' :
-            'bg-emerald-50 border-emerald-100 text-emerald-600'
-         }`}>
-            {isSyncing ? <Loader2 size={14} className="animate-spin"/> : !binId ? <CloudOff size={14} /> : <Check size={14} strokeWidth={3} />}
-            <span className="text-[10px] font-black uppercase tracking-widest">
-              {isSyncing ? 'Syncing' : !binId ? 'Offline' : 'Synced'}
-            </span>
+         <div className="flex items-center gap-3">
+             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border hidden sm:flex ${
+                !binId ? 'bg-gray-50 border-gray-100 text-gray-400' :
+                isSyncing ? 'bg-blue-50 border-blue-100 text-blue-600' :
+                'bg-emerald-50 border-emerald-100 text-emerald-600'
+             }`}>
+                {isSyncing ? <Loader2 size={14} className="animate-spin"/> : !binId ? <CloudOff size={14} /> : <Check size={14} strokeWidth={3} />}
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  {isSyncing ? 'Syncing' : !binId ? 'Offline' : 'Synced'}
+                </span>
+             </div>
+             <button onClick={() => setCurrentUser(null)} className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                <LogOut size={18} />
+             </button>
          </div>
       </div>
 
@@ -476,6 +481,7 @@ function App() {
                 users={users}
                 onAddTransaction={addTransaction}
                 financeRep={users.find(u => u.role === 'FINANCE_REP')}
+                currentUser={currentUser}
              />
           </div>
 

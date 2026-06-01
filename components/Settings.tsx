@@ -253,7 +253,7 @@ const Settings: React.FC<SettingsProps> = ({
               const parsed = JSON.parse(result);
               onImportData(parsed);
           } catch (err) {
-              console.error(err);
+              console.warn(err);
               alert('Invalid file format. Please upload a valid Thesaurus backup file.');
           }
       };

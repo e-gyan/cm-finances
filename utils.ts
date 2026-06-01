@@ -51,7 +51,7 @@ export const INITIAL_CATEGORIES: Category[] = [
 
 export const INITIAL_USERS: User[] = [
   { id: 'u1', name: 'Admin User', email: 'admin@thesaurus.com', phone: '0200000000', role: 'ADMIN', status: 'ACTIVE', momoNumber: '0200000000', accessCode: '5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5', permissions: ['VIEW_OVERVIEW', 'VIEW_TRANSACTIONS', 'EDIT_TRANSACTIONS', 'VIEW_REPORTS', 'VIEW_SETTINGS'] },
-  { id: 'u2', name: 'Finance Director', email: 'finance@church.com', phone: '0544444444', role: 'FINANCE_REP', status: 'ACTIVE', accessCode: '38ccf618bc32befde7649d21ce9a4918e938da641dedfc176efeb622a559eeb6', permissions: ['VIEW_OVERVIEW', 'VIEW_TRANSACTIONS', 'EDIT_TRANSACTIONS', 'VIEW_REPORTS'] },
+  { id: 'u2', name: 'Finance Director', email: 'finance@church.com', phone: '0544444444', role: 'FINANCE_REP', status: 'ACTIVE', accessCode: 'e2217d3e4e120c6a3372a1890f03e232b35ad659d71f7a62501a4ee204a3e66d', permissions: ['VIEW_OVERVIEW', 'VIEW_TRANSACTIONS', 'EDIT_TRANSACTIONS', 'VIEW_REPORTS'] },
 ];
 
 export const hashAccessCode = async (code: string): Promise<string> => {

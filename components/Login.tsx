@@ -78,17 +78,6 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
           >
             {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Authenticate <ArrowRight size={16} /></>}
           </button>
-          
-          <button 
-            type="button"
-            onClick={() => {
-              const adminUser = users.find(u => u.role === 'ADMIN') || users[0];
-              if (adminUser) onLogin(adminUser);
-            }}
-            className="w-full py-4 bg-gray-100 text-gray-500 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center hover:bg-gray-200 transition-all active:scale-95 mt-4"
-          >
-            Emergency Access (Bypass Login)
-          </button>
         </form>
 
         <p className="text-[10px] text-gray-300 font-bold mt-8 uppercase tracking-widest text-center leading-relaxed">

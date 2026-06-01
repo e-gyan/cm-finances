@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Transaction, TransactionType, AccountType, Category } from '../types';
 import { formatCurrency } from '../utils';
-import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check, ArrowRightLeft, Download } from 'lucide-react';
+import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check, ArrowRightLeft, Download, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import { TransactionFilters } from '../App';
 import * as XLSX from 'xlsx';
 
@@ -298,6 +298,7 @@ const Transactions: React.FC<TransactionsProps> = ({
   filterYear,
   canEdit = false
 }) => {
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('INCOME');
   
   // Filter States - Multi-Select
@@ -309,10 +310,7 @@ const Transactions: React.FC<TransactionsProps> = ({
   const [showArchived, setShowArchived] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState<number>(25);
-  
-  // Mobile specific states
-  const [showFilters, setShowFilters] = useState(false); 
-  
+
   // Edit Mode State (Detail Modal)
   const [isEditingDetail, setIsEditingDetail] = useState(false);
   const [editDetailForm, setEditDetailForm] = useState<Transaction | null>(null);
@@ -332,11 +330,6 @@ const Transactions: React.FC<TransactionsProps> = ({
   useEffect(() => {
     if (initialFilters.accounts) setSelectedAccounts(initialFilters.accounts);
     if (initialFilters.types) setSelectedTypes(initialFilters.types);
-    
-    // Auto-open filters if initial filters exist
-    if ((initialFilters.accounts && initialFilters.accounts.length > 0) || (initialFilters.types && initialFilters.types.length > 0)) {
-        setShowFilters(true);
-    }
   }, [initialFilters]);
 
   // Reset Edit state when selection changes
@@ -454,6 +447,7 @@ const Transactions: React.FC<TransactionsProps> = ({
   const displayedList = itemsPerPage === -1 ? filteredList : filteredList.slice(0, itemsPerPage);
 
   const exportToExcel = () => {
+    // ...
     const headers = ['Date', 'Type', 'Category', 'Amount', 'Account', 'Destination Account', 'Notes'];
     const rows = filteredList.map(t => [
       t.date,
@@ -471,44 +465,97 @@ const Transactions: React.FC<TransactionsProps> = ({
     XLSX.writeFile(workbook, `${filterYear}-finance-records.xlsx`);
   };
 
+  const totals = useMemo(() => {
+    return filteredList.reduce((acc, t) => {
+      if (t.type === TransactionType.INCOME) acc.income += t.amount;
+      if (t.type === TransactionType.EXPENSE) acc.expense += t.amount;
+      if (t.type === TransactionType.TRANSFER) {
+        // transfers don't affect net PL from a system standpoint unless we want them to, but usually they are 0 sum.
+      }
+      return acc;
+    }, { income: 0, expense: 0 });
+  }, [filteredList]);
+
   return (
-    <div className="space-y-6">
-      {/* Desktop Entry Form Card - Hidden on Mobile */}
-      {canEdit && (
-          <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden mb-6">
-            <EntryForm 
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                entries={entries}
-                handleRemoveEntry={handleRemoveEntry}
-                handleAddEntry={handleAddEntry}
-                updateEntry={updateEntry}
-                validateAndSave={validateAndSave}
-                categories={categories}
-                accounts={accounts}
-            />
+    <div className="flex flex-col flex-1 h-full min-h-0 gap-4">
+      {/* Detail/Entry Modals */}
+      {isFormOpen && canEdit && (
+          <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-gray-950/70 backdrop-blur-md animate-in fade-in duration-300">
+              <div className="bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)] w-full max-w-3xl overflow-hidden animate-in slide-in-from-bottom md:zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
+                  <div className="p-4 md:p-6 border-b border-gray-50 flex justify-between items-center shrink-0">
+                      <h3 className="font-black text-gray-900 text-lg uppercase tracking-widest text-[10px]">New Transaction</h3>
+                      <button onClick={() => setIsFormOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl transition-all">
+                          <X size={20} />
+                      </button>
+                  </div>
+                  <div className="overflow-y-auto no-scrollbar">
+                      <EntryForm 
+                          activeTab={activeTab}
+                          setActiveTab={setActiveTab}
+                          entries={entries}
+                          handleRemoveEntry={handleRemoveEntry}
+                          handleAddEntry={handleAddEntry}
+                          updateEntry={updateEntry}
+                          validateAndSave={validateAndSave}
+                          categories={categories}
+                          accounts={accounts}
+                      />
+                  </div>
+              </div>
           </div>
       )}
 
-      {/* History Feed List */}
-      <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
-        <div className="p-4 md:p-8 border-b border-gray-50 flex flex-col gap-4 bg-gray-50/30">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 shrink-0">
+        <div className="bg-emerald-50 p-4 sm:p-6 rounded-[2rem] border border-emerald-100 flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-emerald-600 font-black text-[10px] uppercase tracking-widest">Filtered Income</p>
+            <p className="text-xl md:text-2xl font-black text-emerald-900 mt-1 tracking-tighter">{formatCurrency(totals.income)}</p>
+          </div>
+          <div className="p-3 bg-white rounded-full text-emerald-600 shadow-sm hidden sm:block">
+            <TrendingUp size={20} />
+          </div>
+        </div>
+        <div className="bg-rose-50 p-4 sm:p-6 rounded-[2rem] border border-rose-100 flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-rose-600 font-black text-[10px] uppercase tracking-widest">Filtered Expenses</p>
+            <p className="text-xl md:text-2xl font-black text-rose-900 mt-1 tracking-tighter">{formatCurrency(totals.expense)}</p>
+          </div>
+          <div className="p-3 bg-white rounded-full text-rose-600 shadow-sm hidden sm:block">
+            <TrendingDown size={20} />
+          </div>
+        </div>
+        <div className="bg-blue-50 p-4 sm:p-6 rounded-[2rem] border border-blue-100 flex items-center justify-between shadow-sm sm:col-span-2 lg:col-span-1">
+          <div>
+            <p className="text-blue-600 font-black text-[10px] uppercase tracking-widest">Net Filtered Balance</p>
+            <p className={`text-xl md:text-2xl font-black mt-1 tracking-tighter ${totals.income - totals.expense >= 0 ? "text-primary" : "text-rose-500"}`}>{formatCurrency(totals.income - totals.expense)}</p>
+          </div>
+          <div className="p-3 bg-white rounded-full text-blue-600 shadow-sm hidden sm:block">
+            <Wallet size={20} />
+          </div>
+        </div>
+      </div>
+
+      {/* History Feed List in a restricted height container */}
+      <div className="flex flex-col flex-1 bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden min-h-0">
+        <div className="shrink-0 p-4 md:p-8 border-b border-gray-50 flex flex-col gap-4 bg-gray-50/30">
             
             {/* Top Toolbar */}
             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                 <div className="flex justify-between w-full xl:w-auto items-center">
                     <h3 className="font-black text-gray-900 text-lg md:text-xl tracking-tighter">History Feed</h3>
-                    {/* Mobile Filter Toggle */}
-                    <button 
-                        onClick={() => setShowFilters(!showFilters)} 
-                        className="md:hidden p-2 bg-white rounded-xl border border-gray-200 text-gray-500 shadow-sm"
-                    >
-                        <Filter size={20} />
-                    </button>
                 </div>
                 
                 {/* Search & Actions */}
                 <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
+                    {canEdit && (
+                        <button
+                            onClick={() => setIsFormOpen(true)}
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-teal-800 transition-all shadow-md shadow-primary/20 w-full sm:w-auto"
+                        >
+                            <Plus size={16} /> <span>New Entry</span>
+                        </button>
+                    )}
                     <button
                         onClick={exportToExcel}
                         className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-100 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm w-full sm:w-auto"
@@ -551,15 +598,15 @@ const Transactions: React.FC<TransactionsProps> = ({
                 </div>
             </div>
 
-            {/* Filter Chips - Toggleable */}
-            <div className={`flex flex-col gap-4 animate-in slide-in-from-top-2 duration-300 ${showFilters ? 'flex' : 'hidden md:flex'}`}>
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="w-full sm:w-auto"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Type:</span></div>
+            {/* Always Visible Filter Chips - Scrollable Horizontally on Mobile */}
+            <div className="flex flex-col gap-3">
+                <div className="flex overflow-x-auto no-scrollbar items-center gap-2 pb-1 -mx-4 px-4 md:mx-0 md:px-0">
+                    <span className="text-[10px] whitespace-nowrap font-black text-gray-400 uppercase tracking-widest mr-2 shrink-0 hidden sm:block">Type:</span>
                     {[TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER].map(type => (
                         <button
                             key={type}
                             onClick={() => toggleTypeFilter(type)}
-                            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                            className={`shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
                                 selectedTypes.includes(type)
                                 ? 'bg-gray-900 text-white border-gray-900 shadow-md'
                                 : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
@@ -568,36 +615,38 @@ const Transactions: React.FC<TransactionsProps> = ({
                             {type}
                         </button>
                     ))}
-                    {selectedTypes.length > 0 && <button onClick={() => setSelectedTypes([])} className="text-[10px] text-gray-400 hover:text-rose-500 px-2 w-full sm:w-auto text-left sm:text-center mt-1 sm:mt-0">Clear</button>}
+                    {selectedTypes.length > 0 && <button onClick={() => setSelectedTypes([])} className="text-[10px] shrink-0 font-bold text-gray-400 hover:text-rose-500 px-2 transition-all">Clear</button>}
                 </div>
 
-                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="w-full sm:w-auto"><span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Account:</span></div>
+                 <div className="flex overflow-x-auto no-scrollbar items-center gap-2 pb-1 -mx-4 px-4 md:mx-0 md:px-0">
+                    <span className="text-[10px] whitespace-nowrap font-black text-gray-400 uppercase tracking-widest mr-2 shrink-0 hidden sm:block">Account:</span>
                     {accounts.map(acc => (
                         <button
                             key={acc}
                             onClick={() => toggleAccountFilter(acc)}
-                            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                            className={`shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
                                 selectedAccounts.includes(acc)
                                 ? 'bg-gray-900 text-white border-gray-900 shadow-md'
                                 : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
                             }`}
                         >
-                            {SHORT_ACCOUNT_LABELS[acc] || acc}
+                            {SHORT_ACCOUNT_LABELS[acc as AccountType] || acc}
                         </button>
                     ))}
-                     {selectedAccounts.length > 0 && <button onClick={() => setSelectedAccounts([])} className="text-[10px] text-gray-400 hover:text-rose-500 px-2 w-full sm:w-auto text-left sm:text-center mt-1 sm:mt-0">Clear</button>}
+                     {selectedAccounts.length > 0 && <button onClick={() => setSelectedAccounts([])} className="text-[10px] shrink-0 font-bold text-gray-400 hover:text-rose-500 px-2 transition-all">Clear</button>}
                 </div>
             </div>
 
         </div>
         
-        {/* Render Memoized List */}
-        <HistoryList 
-            displayedList={displayedList} 
-            onSelect={setSelectedTransaction} 
-            showArchived={showArchived} 
-        />
+        {/* Render Memoized List, scrolling area */}
+        <div className="flex-1 overflow-y-auto min-h-0 relative">
+            <HistoryList 
+                displayedList={displayedList} 
+                onSelect={setSelectedTransaction} 
+                showArchived={showArchived} 
+            />
+        </div>
       </div>
 
       {/* Detail Modal */}
