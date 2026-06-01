@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: thesaurus-cm-finances
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # Requires manual entry in the dashboard
+      - key: NODE_ENV
+        value: production
