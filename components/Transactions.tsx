@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { Transaction, TransactionType, AccountType, Category } from '../types';
 import { formatCurrency } from '../utils';
-import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check, ArrowRightLeft, Download, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { Search, Plus, Save, X, Archive, ArrowRight, Calendar, CreditCard, User, FileText, ChevronRight, Eye, EyeOff, ListFilter, Filter, Edit2, Check, ArrowRightLeft, Download, TrendingUp, TrendingDown, Wallet, Cloud, Loader2 } from 'lucide-react';
 import { TransactionFilters } from '../App';
 import * as XLSX from 'xlsx';
+import { googleSignIn, getAccessToken } from '../auth';
+import { uploadExcelToDrive } from '../driveSync';
 
 interface TransactionsProps {
   transactions: Transaction[];
@@ -130,7 +132,7 @@ const EntryForm = ({
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`w-[50%] sm:w-[33%] flex-grow sm:flex-grow-0 px-2 sm:px-4 py-4 md:py-6 text-[10px] font-black tracking-widest transition-all outline-none relative uppercase ${
+              className={`flex-1 flex-grow sm:flex-grow-0 px-1 sm:px-4 py-4 md:py-6 text-[10px] md:text-sm font-black tracking-widest transition-all outline-none relative uppercase ${
                 activeTab === tab 
                   ? tab === 'INCOME' ? 'text-emerald-600' : tab === 'EXPENSE' ? 'text-rose-600' : 'text-blue-600'
                   : 'text-gray-400 hover:text-gray-600'
@@ -194,9 +196,9 @@ const EntryForm = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                    {activeTab === 'TRANSFER' ? (
-                       <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                       <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                            <div>
-                                <label className="block text-[10px] font-black text-blue-400 mb-2 uppercase tracking-widest">From (Source)</label>
+                                <label className="block text-[10px] font-black text-blue-500 mb-2 uppercase tracking-widest">From (Source)</label>
                                 <select 
                                     value={entry.accountId}
                                     onChange={(e) => updateEntry(index, 'accountId', e.target.value)}
@@ -206,11 +208,8 @@ const EntryForm = ({
                                     {accounts.map((a: string) => <option key={a} value={a}>{SHORT_ACCOUNT_LABELS[a as AccountType] || a}</option>)}
                                 </select>
                            </div>
-                           <div className="relative mt-2 md:mt-0">
-                                <div className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 z-10 bg-white rounded-full p-1 border border-blue-100 text-blue-400 shadow-sm">
-                                    <ArrowRight size={16} />
-                                </div>
-                                <label className="block text-[10px] font-black text-blue-400 mb-2 uppercase tracking-widest">To (Destination)</label>
+                           <div className="relative mt-0">
+                                <label className="block text-[10px] font-black text-blue-500 mb-2 uppercase tracking-widest">To (Destination)</label>
                                 <select 
                                     value={entry.toAccountId}
                                     onChange={(e) => updateEntry(index, 'toAccountId', e.target.value)}
@@ -221,8 +220,8 @@ const EntryForm = ({
                                 </select>
                            </div>
                            <div className="md:col-span-2">
-                               <label className="block text-[10px] font-black text-blue-400 mb-2 uppercase tracking-widest">Transfer Notes</label>
-                               <input
+                                <label className="block text-[10px] font-black text-blue-500 mb-2 uppercase tracking-widest">Transfer Notes</label>
+                                <input
                                     type="text"
                                     placeholder="Reason for transfer..."
                                     value={entry.notes}
@@ -314,6 +313,11 @@ const Transactions: React.FC<TransactionsProps> = ({
   // Edit Mode State (Detail Modal)
   const [isEditingDetail, setIsEditingDetail] = useState(false);
   const [editDetailForm, setEditDetailForm] = useState<Transaction | null>(null);
+  
+  // Google Drive Sync State
+  const [isDriveSyncing, setIsDriveSyncing] = useState(false);
+  const [driveAutoSyncEnabled, setDriveAutoSyncEnabled] = useState<boolean>(() => localStorage.getItem('DRIVE_AUTO_SYNC') === 'true');
+  const [needsAuth, setNeedsAuth] = useState(false);
 
   const [entries, setEntries] = useState<any[]>([{ 
     amount: '', 
@@ -447,7 +451,11 @@ const Transactions: React.FC<TransactionsProps> = ({
   const displayedList = itemsPerPage === -1 ? filteredList : filteredList.slice(0, itemsPerPage);
 
   const exportToExcel = () => {
-    // ...
+    const workbook = generateWorkbook();
+    XLSX.writeFile(workbook, `${filterYear}-finance-records.xlsx`);
+  };
+
+  const generateWorkbook = () => {
     const headers = ['Date', 'Type', 'Category', 'Amount', 'Account', 'Destination Account', 'Notes'];
     const rows = filteredList.map(t => [
       t.date,
@@ -462,8 +470,86 @@ const Transactions: React.FC<TransactionsProps> = ({
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
-    XLSX.writeFile(workbook, `${filterYear}-finance-records.xlsx`);
+    return workbook;
   };
+
+  const syncToDrive = async (isAuto: boolean = false) => {
+    if (!isAuto) {
+      const confirmed = window.confirm(
+        `Are you sure you want to sync to Google Drive? This will overwrite the existing "${filterYear}-finance-records.xlsx" file in the "church-related > Others" folder. Proceed?`
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      setIsDriveSyncing(true);
+      let token = await getAccessToken();
+      if (!token) {
+        setNeedsAuth(true);
+        if (!isAuto) {
+           const result = await googleSignIn();
+           token = result?.accessToken || null;
+           setNeedsAuth(false);
+        } else {
+           // Skip auto-sync if we don't have token
+           return;
+        }
+      }
+      
+      if (!token) return;
+
+      const workbook = generateWorkbook();
+      const arrayBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      await uploadExcelToDrive(`${filterYear}-finance-records.xlsx`, arrayBuffer);
+      if (!isAuto) alert("Successfully synced to Google Drive!");
+    } catch (err: any) {
+      console.error(err);
+      if (!isAuto) alert(`Drive Sync Failed: ${err.message}`);
+    } finally {
+      setIsDriveSyncing(false);
+    }
+  };
+
+  const toggleAutoSync = () => {
+    const newVal = !driveAutoSyncEnabled;
+    if (newVal) {
+      const confirmed = window.confirm(
+        `Enable Auto-Sync? This will automatically overwrite "${filterYear}-finance-records.xlsx" in your Google Drive ("church-related > Others") whenever you add, edit, or delete a transaction. Do you agree to these overwrites?`
+      );
+      if (!confirmed) return;
+      
+      // Check auth before enabling
+      getAccessToken().then(token => {
+         if (!token) {
+            googleSignIn().then(result => {
+                if (result) {
+                   setDriveAutoSyncEnabled(true);
+                   localStorage.setItem('DRIVE_AUTO_SYNC', 'true');
+                   syncToDrive(true);
+                }
+            });
+         } else {
+            setDriveAutoSyncEnabled(true);
+            localStorage.setItem('DRIVE_AUTO_SYNC', 'true');
+            syncToDrive(true);
+         }
+      });
+    } else {
+       setDriveAutoSyncEnabled(false);
+       localStorage.setItem('DRIVE_AUTO_SYNC', 'false');
+    }
+  };
+
+  // Trigger Drive Sync on changes if auto-sync is on
+  useEffect(() => {
+    if (driveAutoSyncEnabled && transactions.length > 0) {
+      // Debounce logic
+      const timer = setTimeout(() => {
+        syncToDrive(true);
+      }, 5000); // 5 seconds after modifications stop
+      return () => clearTimeout(timer);
+    }
+  }, [transactions, driveAutoSyncEnabled]);
 
   const totals = useMemo(() => {
     return filteredList.reduce((acc, t) => {
@@ -506,141 +592,156 @@ const Transactions: React.FC<TransactionsProps> = ({
       )}
 
       {/* Summary Cards */}
-      <div className="flex overflow-x-auto no-scrollbar gap-4 shrink-0 pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:grid md:grid-cols-3">
-        <div className="bg-emerald-50 p-4 sm:p-5 rounded-[2rem] border border-emerald-100 flex items-center gap-4 justify-between shadow-sm min-w-[200px] shrink-0">
+      <div className="flex flex-col md:grid md:grid-cols-3 gap-3 md:gap-4 shrink-0 pb-2">
+        <div className="bg-emerald-50/80 p-4 md:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-emerald-100 flex items-center gap-4 justify-between shadow-sm w-full transition-transform active:scale-[0.98]">
           <div>
-            <p className="text-emerald-600 font-black text-[9px] uppercase tracking-widest">Filtered Income</p>
-            <p className="text-lg md:text-xl font-black text-emerald-900 mt-0.5 tracking-tighter">{formatCurrency(totals.income)}</p>
+            <p className="text-emerald-700 font-black text-[10px] uppercase tracking-widest opacity-80">Filtered Income</p>
+            <p className="text-2xl md:text-3xl font-black text-emerald-900 mt-1 tracking-tighter">{formatCurrency(totals.income)}</p>
           </div>
-          <div className="p-2 sm:p-3 bg-white rounded-full text-emerald-600 shadow-sm shrink-0">
-            <TrendingUp size={18} />
+          <div className="p-3 bg-white rounded-[1rem] md:rounded-[1.25rem] text-emerald-600 shadow-sm shrink-0">
+            <TrendingUp size={20} />
           </div>
         </div>
-        <div className="bg-rose-50 p-4 sm:p-5 rounded-[2rem] border border-rose-100 flex items-center gap-4 justify-between shadow-sm min-w-[200px] shrink-0">
+        <div className="bg-rose-50/80 p-4 md:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-rose-100 flex items-center gap-4 justify-between shadow-sm w-full transition-transform active:scale-[0.98]">
           <div>
-            <p className="text-rose-600 font-black text-[9px] uppercase tracking-widest">Filtered Expenses</p>
-            <p className="text-lg md:text-xl font-black text-rose-900 mt-0.5 tracking-tighter">{formatCurrency(totals.expense)}</p>
+            <p className="text-rose-700 font-black text-[10px] uppercase tracking-widest opacity-80">Filtered Expenses</p>
+            <p className="text-2xl md:text-3xl font-black text-rose-900 mt-1 tracking-tighter">{formatCurrency(totals.expense)}</p>
           </div>
-          <div className="p-2 sm:p-3 bg-white rounded-full text-rose-600 shadow-sm shrink-0">
-            <TrendingDown size={18} />
+          <div className="p-3 bg-white rounded-[1rem] md:rounded-[1.25rem] text-rose-600 shadow-sm shrink-0">
+            <TrendingDown size={20} />
           </div>
         </div>
-        <div className="bg-blue-50 p-4 sm:p-5 rounded-[2rem] border border-blue-100 flex items-center gap-4 justify-between shadow-sm min-w-[200px] shrink-0 md:col-span-1">
+        <div className="bg-blue-50/80 p-4 md:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-blue-100 flex items-center gap-4 justify-between shadow-sm w-full transition-transform active:scale-[0.98]">
           <div>
-            <p className="text-blue-600 font-black text-[9px] uppercase tracking-widest">Net Filtered Bal</p>
-            <p className={`text-lg md:text-xl font-black mt-0.5 tracking-tighter ${totals.income - totals.expense >= 0 ? "text-primary" : "text-rose-500"}`}>{formatCurrency(totals.income - totals.expense)}</p>
+            <p className="text-blue-700 font-black text-[10px] uppercase tracking-widest opacity-80">Net Balance</p>
+            <p className={`text-2xl md:text-3xl font-black text-blue-900 mt-1 tracking-tighter ${totals.income - totals.expense >= 0 ? "text-primary" : "text-rose-600"}`}>{formatCurrency(totals.income - totals.expense)}</p>
           </div>
-          <div className="p-2 sm:p-3 bg-white rounded-full text-blue-600 shadow-sm shrink-0">
-            <Wallet size={18} />
+          <div className="p-3 bg-white rounded-[1rem] md:rounded-[1.25rem] text-blue-600 shadow-sm shrink-0">
+            <Wallet size={20} />
           </div>
         </div>
       </div>
 
       {/* History Feed List in a restricted height container */}
-      <div className="flex flex-col flex-1 bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden min-h-0">
-        <div className="shrink-0 p-4 md:p-8 border-b border-gray-50 flex flex-col gap-4 bg-gray-50/30">
+      <div className="flex flex-col flex-1 bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] md:shadow-xl md:shadow-gray-200/50 border border-gray-100 overflow-hidden min-h-0 relative z-10 -mt-2 md:mt-0 pt-2 md:pt-0">
+        <div className="shrink-0 p-5 md:p-8 border-b border-gray-50 flex flex-col gap-5 bg-white">
             
-            {/* Top Toolbar */}
-            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-                <div className="flex justify-between w-full xl:w-auto items-center">
-                    <h3 className="font-black text-gray-900 text-lg md:text-xl tracking-tighter">History Feed</h3>
+            {/* Header Title hidden on mobile to save space, visible on desktop */}
+            <div className="hidden md:flex justify-between w-full items-center mb-2">
+                <h3 className="font-black text-gray-900 text-xl tracking-tighter">Transaction History Dashboard</h3>
+            </div>
+            
+            {/* Re-engineered Filter & Actions Area */}
+            <div className="flex flex-col gap-4">
+                {/* Search Bar - Full Width with clean pill design */}
+                <div className="relative w-full">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                        type="text" 
+                        placeholder="Search by category, note, or recipient..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-11 pr-5 py-3.5 bg-gray-50/80 border border-gray-100 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white w-full transition-all text-gray-800 placeholder-gray-400"
+                    />
                 </div>
                 
-                {/* Search & Actions */}
-                <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
-                    {canEdit && (
-                        <button
-                            onClick={() => setIsFormOpen(true)}
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-teal-800 transition-all shadow-md shadow-primary/20 w-full sm:w-auto"
-                        >
-                            <Plus size={16} /> <span>New Entry</span>
-                        </button>
-                    )}
+                {/* Action Row - Wraps on Mobile */}
+                <div className="flex flex-wrap items-center gap-2 pb-2">
                     <button
                         onClick={exportToExcel}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-100 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm w-full sm:w-auto"
-                        title="Export to Excel"
+                        className="grow md:grow-0 shrink-0 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm active:scale-95"
                     >
-                        <Download size={16} /> <span>Export</span>
+                        <Download size={14} /> <span>Get XLSX</span>
                     </button>
-                    <div className="relative flex-1 w-full">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="Search..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-12 pr-6 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 w-full shadow-sm"
-                        />
-                    </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                        <button
-                            onClick={() => setShowArchived(!showArchived)}
-                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all shadow-sm ${
-                                showArchived ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
-                            }`}
+                    
+                    <button
+                        onClick={() => syncToDrive(false)}
+                        disabled={isDriveSyncing}
+                        className={`grow md:grow-0 shrink-0 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 transition-all shadow-sm active:scale-95 ${isDriveSyncing ? 'text-blue-400 opacity-80' : 'text-blue-600'}`}
+                    >
+                        {isDriveSyncing ? <Loader2 size={14} className="animate-spin" /> : <Cloud size={14} />}
+                        <span>{isDriveSyncing ? 'Syncing...' : 'Drive Sync'}</span>
+                    </button>
+                    
+                    <button
+                        onClick={toggleAutoSync}
+                        className={`grow md:grow-0 shrink-0 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${driveAutoSyncEnabled ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}
+                    >
+                        {driveAutoSyncEnabled ? <Check size={14} className="text-emerald-500" /> : <div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300" />}
+                        <span>Auto-Sync</span>
+                    </button>
+
+                    <div className="w-px h-5 bg-gray-200 shrink-0 mx-1 hidden md:block"></div>
+
+                    <button
+                        onClick={() => setShowArchived(!showArchived)}
+                        className={`grow md:grow-0 shrink-0 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${
+                            showArchived ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border border-gray-200'
+                        }`}
+                    >
+                        {showArchived ? <EyeOff size={14} /> : <Eye size={14} />}
+                        <span>Archived</span>
+                    </button>
+                    
+                    <div className="relative shrink-0 grow md:grow-0 min-w-[120px] md:min-w-[70px]">
+                        <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                        <select 
+                            value={itemsPerPage}
+                            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                            className="pl-8 pr-3 h-[38px] w-full bg-white border border-gray-200 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest focus:outline-none shadow-sm cursor-pointer appearance-none transition-all active:scale-95"
                         >
-                            {showArchived ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                         <div className="relative h-[42px] md:h-auto flex-1 sm:min-w-[80px]">
-                            <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                            <select 
-                                value={itemsPerPage}
-                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                                className="pl-9 pr-4 h-full w-full bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:outline-none shadow-sm cursor-pointer appearance-none py-3"
+                            <option value={25}>25 items</option>
+                            <option value={50}>50 items</option>
+                            <option value={-1}>All items</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Filter Chips Layer */}
+                <div className="flex flex-col gap-2.5">
+                    {/* Types */}
+                    <div className="flex flex-wrap items-center gap-2 pb-1">
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 shrink-0">Type:</span>
+                        {[TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER].map(type => (
+                            <button
+                                key={type}
+                                onClick={() => toggleTypeFilter(type)}
+                                className={`grow snap-start shrink-0 px-3.5 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest border transition-all ${
+                                    selectedTypes.includes(type)
+                                    ? 'bg-gray-800 text-white border-gray-800 shadow-md ring-2 ring-gray-200 ring-offset-1'
+                                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                                }`}
                             >
-                                <option value={25}>25</option>
-                                <option value={50}>50</option>
-                                <option value={-1}>All</option>
-                            </select>
-                        </div>
+                                {type}
+                            </button>
+                        ))}
+                        {selectedTypes.length > 0 && <button onClick={() => setSelectedTypes([])} className="text-[9px] shrink-0 font-bold text-gray-400 hover:text-rose-500 px-2 transition-all">Clear</button>}
+                    </div>
+
+                    {/* Accounts */}
+                    <div className="flex flex-wrap items-center gap-2 pb-1">
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 shrink-0">Acc:</span>
+                        {accounts.map(acc => (
+                            <button
+                                key={acc}
+                                onClick={() => toggleAccountFilter(acc)}
+                                className={`grow snap-start shrink-0 px-3.5 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest border transition-all ${
+                                    selectedAccounts.includes(acc)
+                                    ? 'bg-gray-800 text-white border-gray-800 shadow-md ring-2 ring-gray-200 ring-offset-1'
+                                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                                }`}
+                            >
+                                {SHORT_ACCOUNT_LABELS[acc as AccountType] || acc}
+                            </button>
+                        ))}
+                         {selectedAccounts.length > 0 && <button onClick={() => setSelectedAccounts([])} className="text-[9px] shrink-0 font-bold text-gray-400 hover:text-rose-500 px-2 transition-all">Clear</button>}
                     </div>
                 </div>
             </div>
-
-            {/* Always Visible Filter Chips - Scrollable Horizontally on Mobile */}
-            <div className="flex flex-col gap-3">
-                <div className="flex overflow-x-auto no-scrollbar items-center gap-2 pb-1 -mx-4 px-4 md:mx-0 md:px-0">
-                    <span className="text-[10px] whitespace-nowrap font-black text-gray-400 uppercase tracking-widest mr-2 shrink-0 hidden sm:block">Type:</span>
-                    {[TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER].map(type => (
-                        <button
-                            key={type}
-                            onClick={() => toggleTypeFilter(type)}
-                            className={`shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-                                selectedTypes.includes(type)
-                                ? 'bg-gray-900 text-white border-gray-900 shadow-md'
-                                : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
-                            }`}
-                        >
-                            {type}
-                        </button>
-                    ))}
-                    {selectedTypes.length > 0 && <button onClick={() => setSelectedTypes([])} className="text-[10px] shrink-0 font-bold text-gray-400 hover:text-rose-500 px-2 transition-all">Clear</button>}
-                </div>
-
-                 <div className="flex overflow-x-auto no-scrollbar items-center gap-2 pb-1 -mx-4 px-4 md:mx-0 md:px-0">
-                    <span className="text-[10px] whitespace-nowrap font-black text-gray-400 uppercase tracking-widest mr-2 shrink-0 hidden sm:block">Account:</span>
-                    {accounts.map(acc => (
-                        <button
-                            key={acc}
-                            onClick={() => toggleAccountFilter(acc)}
-                            className={`shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-                                selectedAccounts.includes(acc)
-                                ? 'bg-gray-900 text-white border-gray-900 shadow-md'
-                                : 'bg-white text-gray-500 border-gray-100 hover:bg-gray-50'
-                            }`}
-                        >
-                            {SHORT_ACCOUNT_LABELS[acc as AccountType] || acc}
-                        </button>
-                    ))}
-                     {selectedAccounts.length > 0 && <button onClick={() => setSelectedAccounts([])} className="text-[10px] shrink-0 font-bold text-gray-400 hover:text-rose-500 px-2 transition-all">Clear</button>}
-                </div>
-            </div>
-
         </div>
         
         {/* Render Memoized List, scrolling area */}
-        <div className="flex-1 overflow-y-auto min-h-0 relative">
+        <div className="flex-1 overflow-y-auto no-scrollbar min-h-0 relative bg-gray-50/30">
             <HistoryList 
                 displayedList={displayedList} 
                 onSelect={setSelectedTransaction} 
@@ -841,6 +942,16 @@ const Transactions: React.FC<TransactionsProps> = ({
               </div>
           </div>
       )}
+      {/* FAB (Floating Action Button) for Mobile & Desktop */}
+      {canEdit && !isFormOpen && (
+          <button
+              onClick={() => setIsFormOpen(true)}
+              className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50 bg-primary text-white w-14 h-14 md:w-16 md:h-16 rounded-[1.25rem] md:rounded-[1.5rem] flex items-center justify-center shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 hover:bg-teal-700 hover:shadow-xl hover:shadow-primary/40 transition-all duration-300 pointer-events-auto"
+          >
+              <Plus size={24} className="md:w-7 md:h-7" />
+          </button>
+      )}
+
     </div>
   );
 };

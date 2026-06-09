@@ -82,6 +82,16 @@ function App() {
 
   // --- CLOUD SYNC LOGIC ---
 
+  useEffect(() => {
+    // dynamically import initAuth once component mounts
+    import('./auth').then(({ initAuth }) => {
+      initAuth(
+        (u, token) => console.log('Google Auth initialized'),
+        () => console.log('Google Auth required')
+      );
+    });
+  }, []);
+
   const saveToCloud = useCallback(async (newData?: { transactions?: Transaction[], categories?: Category[], users?: User[] }) => {
     if (!binId || !apiKey) return;
     
