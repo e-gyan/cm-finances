@@ -44,6 +44,7 @@ export interface User {
   momoNumber?: string;
   accessCode?: string;
   permissions?: ('VIEW_OVERVIEW' | 'VIEW_TRANSACTIONS' | 'EDIT_TRANSACTIONS' | 'VIEW_REPORTS' | 'VIEW_SETTINGS')[];
+  attendanceCount?: number;
 }
 
 export type Period = 'WEEK' | 'MONTH' | 'QUARTER' | 'YEAR';

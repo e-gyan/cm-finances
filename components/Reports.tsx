@@ -40,6 +40,7 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const [selectedFinanceRep, setSelectedFinanceRep] = useState<string>(''); 
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<string>(''); 
   const [beneficiaryNumber, setBeneficiaryNumber] = useState<string>(''); 
+  const [sendOnlyOfferings, setSendOnlyOfferings] = useState(false);
 
   // AI Loading State
   const [isAutoPlanning, setIsAutoPlanning] = useState(false);
@@ -363,7 +364,12 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
   const handleShareClick = () => {
       if (activeTab === 'WEEKLY') {
           // Do not prefill users - User must select
-          setSelectedFinanceRep("");
+          const antoinetteUser = users.find(u => u.name.toLowerCase().includes('antoinette') && u.role === 'VIEWER');
+          if (sendOnlyOfferings && antoinetteUser) {
+              setSelectedFinanceRep(antoinetteUser.name);
+          } else {
+              setSelectedFinanceRep("");
+          }
           setSelectedBeneficiary("");
           setBeneficiaryNumber("");
           
@@ -386,31 +392,36 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
     text += `---------------------------\n`;
 
     if (activeTab === 'WEEKLY') {
-      text += `*OFFERINGS*\nCash: ${formatCurrency(weeklyStats.offerings.cash)}\nMoMo: ${formatCurrency(weeklyStats.offerings.momo)}\n\n*Total Offerings: ${formatCurrency(weeklyStats.totalIncome)}*\n\n`;
-      
-      text += `*EXPENSES*\n`;
-      const start = customWeekStart ? new Date(customWeekStart) : getWeekRange(selectedWeekDate).start;
-      const end = customWeekEnd ? new Date(customWeekEnd) : getWeekRange(selectedWeekDate).end;
-      end.setHours(23,59,59,999);
-      
-      const weeklyExpenses = transactions.filter(t => !t.isArchived && t.type === TransactionType.EXPENSE && new Date(t.date) >= start && new Date(t.date) <= end);
+      if (sendOnlyOfferings) {
+          text += `*OFFERINGS*\nCash: ${formatCurrency(weeklyStats.offerings.cash)}\nMoMo: ${formatCurrency(weeklyStats.offerings.momo)}\n\n*Total Offerings: ${formatCurrency(weeklyStats.totalIncome)}*\n\n`;
+          let repName = selectedFinanceRep ? selectedFinanceRep.split(' ')[0] : 'Antoinette';
+          text += `Hello ${repName}, this is the total offering for Sunday.\n`;
+      } else {
+          text += `*OFFERINGS*\nCash: ${formatCurrency(weeklyStats.offerings.cash)}\nMoMo: ${formatCurrency(weeklyStats.offerings.momo)}\n\n*Total Offerings: ${formatCurrency(weeklyStats.totalIncome)}*\n\n`;
+          
+          text += `*EXPENSES*\n`;
+          const start = customWeekStart ? new Date(customWeekStart) : getWeekRange(selectedWeekDate).start;
+          const end = customWeekEnd ? new Date(customWeekEnd) : getWeekRange(selectedWeekDate).end;
+          end.setHours(23,59,59,999);
+          
+          const weeklyExpenses = transactions.filter(t => !t.isArchived && t.type === TransactionType.EXPENSE && new Date(t.date) >= start && new Date(t.date) <= end);
 
-      if (weeklyExpenses.length > 0) {
-          weeklyExpenses.forEach(t => {
-              if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
-                  t.meta.breakdown.forEach((item: {item: string, amount: number}) => text += `- ${item.item}: ${formatCurrency(item.amount)}\n`);
-              } else {
-                  text += `- ${t.notes || t.category}: ${formatCurrency(t.amount)}\n`;
-              }
-          });
-      } else { text += `No expenses recorded.\n`; }
-      
-      text += `\n*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
-      
-      // Request Section - Always based on Total Expenses now
-      text += `Hello @${selectedFinanceRep}, `;
-      text += `could you kindly assist CM with *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the above expenses?\n`;
-
+          if (weeklyExpenses.length > 0) {
+              weeklyExpenses.forEach(t => {
+                  if (t.meta?.breakdown && Array.isArray(t.meta.breakdown)) {
+                      t.meta.breakdown.forEach((item: {item: string, amount: number}) => text += `- ${item.item}: ${formatCurrency(item.amount)}\n`);
+                  } else {
+                      text += `- ${t.notes || t.category}: ${formatCurrency(t.amount)}\n`;
+                  }
+              });
+          } else { text += `No expenses recorded.\n`; }
+          
+          text += `\n*Total Expenses: ${formatCurrency(weeklyStats.totalExpense)}*\n\n`;
+          
+          // Request Section - Always based on Total Expenses now
+          text += `Hello @${selectedFinanceRep}, `;
+          text += `could you kindly assist CM with *${formatCurrency(weeklyStats.totalExpense)}* to ${beneficiaryNumber} (${selectedBeneficiary}) for the purchase of the above expenses?\n`;
+      }
     } else if (activeTab === 'QUARTERLY') {
         const qName = `Q${selectedQuarter}`;
         const qRange = getQuarterRangeName(selectedQuarter);
@@ -427,7 +438,24 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
       text += `Income: ${formatCurrency(analyticalData.totalIncome)}\nExpense: ${formatCurrency(analyticalData.totalExpense)}\n*Net: ${formatCurrency(analyticalData.net)}*\n`;
     }
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    let phoneParams = '';
+    if (selectedFinanceRep) {
+        const targetUser = users.find(u => u.name === selectedFinanceRep);
+        if (targetUser?.phone) {
+            let phoneClean = targetUser.phone.replace(/\D/g, '');
+            // default to ghana dialing code if local format
+            if (phoneClean.startsWith('0') && phoneClean.length === 10) {
+                phoneClean = '233' + phoneClean.substring(1);
+            }
+            phoneParams = `${phoneClean}`;
+        }
+    }
+
+    if (phoneParams) {
+        window.open(`https://wa.me/${phoneParams}?text=${encodeURIComponent(text)}`, '_blank');
+    } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
     setIsRequestModalOpen(false); 
   };
 
@@ -720,18 +748,40 @@ const Reports: React.FC<ReportsProps> = ({ transactions, users, onAddTransaction
                       <p className="text-blue-700 text-sm font-medium">Requesting <span className="font-black">{formatCurrency(weeklyStats.totalExpense)}</span> for weekly expenses.</p>
                   </div>
                   <div className="p-8 space-y-6">
+                      <div className="flex items-center gap-3">
+                          <input 
+                              type="checkbox" 
+                              id="sendOnlyOfferings" 
+                              checked={sendOnlyOfferings} 
+                              onChange={(e) => {
+                                  setSendOnlyOfferings(e.target.checked);
+                                  if (e.target.checked) {
+                                      const antoinetteUser = users.find(u => u.name.toLowerCase().includes('antoinette') && u.role === 'VIEWER');
+                                      if (antoinetteUser) setSelectedFinanceRep(antoinetteUser.name);
+                                  }
+                              }} 
+                              className="w-5 h-5 rounded-md text-primary focus:ring-primary accent-primary" 
+                          />
+                          <label htmlFor="sendOnlyOfferings" className="text-xs font-black text-gray-700 uppercase tracking-widest cursor-pointer">
+                              Send only total offering to Viewer {users.find(u => u.name.toLowerCase().includes('antoinette')) ? '(Antoinette Mireku)' : ''}
+                          </label>
+                      </div>
                       <div>
                           <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Request To</label>
-                          <input list="finance-reps" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="Finance Rep..." value={selectedFinanceRep} onChange={(e) => setSelectedFinanceRep(e.target.value)} />
-                          <datalist id="finance-reps">{users.filter(u => u.role === 'FINANCE_REP' || u.role === 'ADMIN').map(u => <option key={u.id} value={u.name} />)}</datalist>
+                          <input list="finance-reps" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder={sendOnlyOfferings ? "Viewer..." : "Finance Rep..."} value={selectedFinanceRep} onChange={(e) => setSelectedFinanceRep(e.target.value)} />
+                          <datalist id="finance-reps">{users.filter(u => sendOnlyOfferings ? u.role === 'VIEWER' : (u.role === 'FINANCE_REP' || u.role === 'ADMIN')).map(u => <option key={u.id} value={u.name} />)}</datalist>
                       </div>
-                      <div>
-                          <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Beneficiary Account</label>
-                          <input list="beneficiaries" className="w-full p-4 mb-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="Beneficiary Name..." value={selectedBeneficiary} onChange={(e) => { setSelectedBeneficiary(e.target.value); const u = users.find(user => user.name === e.target.value); if(u) setBeneficiaryNumber(u.momoNumber || ''); }} />
-                          <datalist id="beneficiaries">{users.map(u => <option key={u.id} value={u.name} />)}</datalist>
-                          <input type="text" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="024..." value={beneficiaryNumber} onChange={(e) => setBeneficiaryNumber(e.target.value)} />
-                      </div>
-                      <button onClick={generateAndOpenWhatsApp} disabled={!selectedFinanceRep || !selectedBeneficiary} className="w-full py-4 bg-[#25D366] text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-[#128C7E] shadow-xl">Generate Request</button>
+                      {!sendOnlyOfferings && (
+                          <div>
+                              <label className="text-[10px] font-black text-gray-400 mb-2 block uppercase tracking-widest">Beneficiary Account</label>
+                              <input list="beneficiaries" className="w-full p-4 mb-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="Beneficiary Name..." value={selectedBeneficiary} onChange={(e) => { setSelectedBeneficiary(e.target.value); const u = users.find(user => user.name === e.target.value); if(u) setBeneficiaryNumber(u.momoNumber || ''); }} />
+                              <datalist id="beneficiaries">{users.map(u => <option key={u.id} value={u.name} />)}</datalist>
+                              <input type="text" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold outline-none" placeholder="024..." value={beneficiaryNumber} onChange={(e) => setBeneficiaryNumber(e.target.value)} />
+                          </div>
+                      )}
+                      <button onClick={generateAndOpenWhatsApp} disabled={!selectedFinanceRep || (!sendOnlyOfferings && !selectedBeneficiary)} className="w-full py-4 bg-[#25D366] text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-[#128C7E] shadow-xl">
+                          {sendOnlyOfferings ? 'Share Total Offering' : 'Generate Request'}
+                      </button>
                       <button onClick={() => setIsRequestModalOpen(false)} className="w-full py-3 text-gray-400 text-[10px] font-black uppercase tracking-widest">Cancel</button>
                   </div>
               </div>

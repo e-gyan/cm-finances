@@ -73,7 +73,15 @@ function App() {
     loadState('THESAURUS_CURRENT_USER', null)
   );
 
-  const [activeView, setActiveView] = useState<'OVERVIEW' | 'TRANSACTIONS' | 'REPORTS' | 'SETTINGS'>('OVERVIEW');
+  const [activeView, setActiveView] = useState<'OVERVIEW' | 'TRANSACTIONS' | 'REPORTS' | 'SETTINGS'>(() => {
+    const saved = localStorage.getItem('THESAURUS_ACTIVE_VIEW');
+    return (saved as any) || 'OVERVIEW';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('THESAURUS_ACTIVE_VIEW', activeView);
+  }, [activeView]);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Default to collapsed
   
   // Navigation Filters
